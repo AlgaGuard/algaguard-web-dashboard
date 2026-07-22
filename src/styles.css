@@ -1,0 +1,81 @@
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #123;
+  background: #f4f8f7;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template: auto 1fr / 15rem 1fr;
+}
+header {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: #073b3a;
+  color: white;
+}
+aside {
+  padding: 1rem;
+  background: #dcebea;
+}
+nav {
+  display: grid;
+  gap: 0.35rem;
+}
+nav a {
+  color: #073b3a;
+  padding: 0.65rem;
+  border-radius: 0.4rem;
+  text-decoration: none;
+}
+nav a.active,
+nav a:focus-visible {
+  background: #fff;
+  outline: 2px solid #0b7772;
+}
+main {
+  padding: clamp(1rem, 4vw, 3rem);
+  overflow: auto;
+}
+.badge,
+.notice {
+  background: #fff3cd;
+  color: #5f4700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.35rem;
+}
+pre {
+  background: white;
+  border: 1px solid #c7d8d6;
+  padding: 1rem;
+  overflow: auto;
+}
+button {
+  font: inherit;
+  padding: 0.65rem 1rem;
+}
+@media (max-width: 760px) {
+  .shell {
+    grid-template: auto auto 1fr / 1fr;
+  }
+  header {
+    grid-column: 1;
+  }
+  aside {
+    overflow-x: auto;
+  }
+  nav {
+    display: flex;
+  }
+  nav a {
+    white-space: nowrap;
+  }
+}
