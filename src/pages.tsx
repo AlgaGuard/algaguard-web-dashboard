@@ -1,5 +1,5 @@
 import { FormEvent, type ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
 import { initializeAuthentication, keycloak } from "./auth";
@@ -96,7 +96,7 @@ export function LoginPage() {
 }
 
 export function AuthCallbackPage() {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     void initializeAuthentication()

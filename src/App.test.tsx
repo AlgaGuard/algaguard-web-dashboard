@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -9,11 +8,10 @@ function renderApp(path = "/dashboard") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  window.history.replaceState({}, "", path);
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>
-        <App />
-      </MemoryRouter>
+      <App />
     </QueryClientProvider>,
   );
   return { ...view, queryClient };

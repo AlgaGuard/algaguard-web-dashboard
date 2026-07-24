@@ -1,13 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  NavLink,
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
 import { hasRole, initializeAuthentication, keycloak } from "./auth";
@@ -33,11 +25,9 @@ const navigation = [
   ["OTA", "/ota"],
 ] as const;
 
-function ProtectedRoute() {
-  const location = useLocation();
-  if (!keycloak.authenticated)
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  return <Outlet />;
+function ProtectedPage({ children }: { children: ReactNode }) {
+  if (!keycloak.authenticated) return <Redirect to="/login" replace />;
+  return <AppShell>{children}</AppShell>;
 }
 
 function useRealtime() {
@@ -61,7 +51,7 @@ function useRealtime() {
   return state;
 }
 
-function AppShell() {
+function AppShell({ children }: { children: ReactNode }) {
   const realtime = useRealtime();
   const visibleNavigation = useMemo(
     () =>
@@ -87,43 +77,69 @@ function AppShell() {
       <aside>
         <nav aria-label="Primary">
           {visibleNavigation.map(([label, path]) => (
-            <NavLink key={path} to={path}>
+            <Link key={path} href={path}>
               {label}
-            </NavLink>
+            </Link>
           ))}
         </nav>
       </aside>
-      <main>
-        <Outlet />
-      </main>
+      <main>{children}</main>
     </div>
   );
 }
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppShell />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/organizations" element={<OrganizationsPage />} />
-          <Route path="/devices" element={<DevicesPage />} />
-          <Route path="/devices/:deviceUuid" element={<DeviceDetailsPage />} />
-          <Route path="/profiles" element={<ProfilesPage />} />
-          <Route path="/commands" element={<CommandPage />} />
-          <Route path="/ota" element={<OtaPage />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Route>
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/auth/callback" component={AuthCallbackPage} />
+      <Route path="/dashboard">
+        <ProtectedPage>
+          <DashboardPage />
+        </ProtectedPage>
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+      <Route path="/organizations">
+        <ProtectedPage>
+          <OrganizationsPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/devices/:deviceUuid">
+        <ProtectedPage>
+          <DeviceDetailsPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/devices">
+        <ProtectedPage>
+          <DevicesPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/profiles">
+        <ProtectedPage>
+          <ProfilesPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/commands">
+        <ProtectedPage>
+          <CommandPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/ota">
+        <ProtectedPage>
+          <OtaPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/">
+        <Redirect to="/dashboard" replace />
+      </Route>
+      <Route>
+        <Redirect to="/dashboard" replace />
+      </Route>
+    </Switch>
   );
 }
 
 export function CallbackRecovery() {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   useEffect(() => {
     void initializeAuthentication().finally(() =>
       navigate("/dashboard", { replace: true }),
