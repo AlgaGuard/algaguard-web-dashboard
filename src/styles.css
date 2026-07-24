@@ -1,6 +1,6 @@
 :root {
-  font-family: Inter, system-ui, sans-serif;
-  color: #123;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #16312f;
   background: #f4f8f7;
 }
 * {
@@ -9,18 +9,70 @@
 body {
   margin: 0;
 }
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+.button-link {
+  cursor: pointer;
+  border: 0;
+  border-radius: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  background: #087b72;
+  color: #fff;
+  text-decoration: none;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 .shell {
   min-height: 100vh;
   display: grid;
-  grid-template: auto 1fr / 15rem 1fr;
+  grid-template: auto 1fr / 15rem minmax(0, 1fr);
 }
 header {
   grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
   background: #073b3a;
   color: white;
+}
+header strong {
+  font-size: 1.25rem;
+  margin-right: 0.75rem;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.badge,
+.notice {
+  display: inline-block;
+  background: #fff3cd;
+  color: #5f4700;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.35rem;
+}
+.connection {
+  text-transform: capitalize;
+  font-size: 0.85rem;
+}
+.connection.connected {
+  color: #b8f5cd;
+}
+.connection.recovering,
+.connection.connecting {
+  color: #ffe49a;
+}
+.connection.disconnected {
+  color: #ffd2d2;
 }
 aside {
   padding: 1rem;
@@ -45,22 +97,123 @@ main {
   padding: clamp(1rem, 4vw, 3rem);
   overflow: auto;
 }
-.badge,
-.notice {
-  background: #fff3cd;
-  color: #5f4700;
-  padding: 0.35rem 0.65rem;
-  border-radius: 0.35rem;
+.page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
-pre {
-  background: white;
+.page-heading h1 {
+  margin: 0 0 0.5rem;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+}
+.metric,
+.panel,
+.list > article,
+.list > button {
   border: 1px solid #c7d8d6;
+  border-radius: 0.65rem;
+  background: #fff;
   padding: 1rem;
-  overflow: auto;
 }
-button {
-  font: inherit;
-  padding: 0.65rem 1rem;
+.metric span,
+.list span {
+  display: block;
+  color: #52716e;
+  font-size: 0.85rem;
+}
+.metric strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.35rem;
+}
+.telemetry {
+  margin-bottom: 1.5rem;
+}
+.two-column {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.panel h2 {
+  margin-top: 0;
+}
+.empty {
+  color: #52716e;
+}
+.list {
+  display: grid;
+  gap: 0.8rem;
+}
+.list > button {
+  color: inherit;
+  text-align: left;
+}
+.list > button.selected {
+  outline: 3px solid #087b72;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+th,
+td {
+  padding: 0.8rem;
+  border-bottom: 1px solid #dcebea;
+  text-align: left;
+}
+.history {
+  height: 12rem;
+  display: flex;
+  gap: 0.2rem;
+  align-items: flex-end;
+  background: #fff;
+  border: 1px solid #c7d8d6;
+  border-radius: 0.65rem;
+  padding: 1rem;
+}
+.history span {
+  flex: 1;
+  min-width: 0.2rem;
+  background: #087b72;
+  border-radius: 0.2rem 0.2rem 0 0;
+}
+.form {
+  display: grid;
+  gap: 1rem;
+  max-width: 35rem;
+}
+.form label {
+  display: grid;
+  gap: 0.35rem;
+}
+.form input,
+.form select {
+  border: 1px solid #89a7a3;
+  border-radius: 0.35rem;
+  padding: 0.6rem;
+}
+.form .checkbox {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+}
+.login {
+  max-width: 38rem;
+  margin: 12vh auto;
+  padding: 2rem;
+  background: #fff;
+  border: 1px solid #c7d8d6;
+  border-radius: 0.75rem;
 }
 @media (max-width: 760px) {
   .shell {
@@ -68,6 +221,8 @@ button {
   }
   header {
     grid-column: 1;
+    align-items: flex-start;
+    flex-direction: column;
   }
   aside {
     overflow-x: auto;
@@ -77,5 +232,8 @@ button {
   }
   nav a {
     white-space: nowrap;
+  }
+  .page-heading {
+    flex-direction: column;
   }
 }

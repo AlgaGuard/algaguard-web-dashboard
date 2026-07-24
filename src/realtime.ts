@@ -28,7 +28,15 @@ export class RealtimeClient {
           schemaVersion: "1.0.0",
           requestId: crypto.randomUUID(),
           subscriptions: [
-            { resourceType: "current-user", events: ["system.notification"] },
+            {
+              resourceType: "current-user",
+              events: [
+                "system.notification",
+                "device.telemetry",
+                "command.status",
+                "ota.status",
+              ],
+            },
           ],
         }),
       );
@@ -37,6 +45,7 @@ export class RealtimeClient {
     this.socket.onmessage = (event) =>
       this.onEvent(JSON.parse(String(event.data)));
     this.socket.onclose = () => void this.reconnect();
+    this.socket.onerror = () => this.onState("disconnected");
   }
   stop() {
     this.stopped = true;
@@ -48,6 +57,6 @@ export class RealtimeClient {
     const delay =
       Math.min(30_000, 500 * 2 ** this.attempt++) + Math.random() * 250;
     await new Promise((resolve) => setTimeout(resolve, delay));
-    await this.connect();
+    await this.connect().catch(() => this.onState("disconnected"));
   }
 }
