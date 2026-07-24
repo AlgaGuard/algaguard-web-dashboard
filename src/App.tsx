@@ -1,38 +1,88 @@
-import { NavLink, Route, Routes } from "react-router-dom";
-import { DataPage, LoginPage } from "./pages";
-import { hasRole, keycloak } from "./auth";
+import { useEffect, useMemo, useState } from "react";
+import {
+  NavLink,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "./api";
+import { hasRole, initializeAuthentication, keycloak } from "./auth";
+import {
+  AuthCallbackPage,
+  CommandPage,
+  DashboardPage,
+  DeviceDetailsPage,
+  DevicesPage,
+  LoginPage,
+  OrganizationsPage,
+  OtaPage,
+  ProfilesPage,
+} from "./pages";
+import { RealtimeClient, type RealtimeState } from "./realtime";
 
 const navigation = [
-  ["Overview", "/"],
+  ["Dashboard", "/dashboard"],
   ["Organizations", "/organizations"],
   ["Devices", "/devices"],
-  ["Device details", "/devices/demo"],
-  ["Live telemetry", "/telemetry/live"],
-  ["Telemetry history", "/telemetry/history"],
   ["Profiles", "/profiles"],
   ["Commands", "/commands"],
-  ["OTA releases", "/ota"],
-  ["Access", "/access"],
+  ["OTA", "/ota"],
 ] as const;
 
-export function App() {
-  const visibleNavigation = navigation.filter(([label]) =>
-    label === "Access"
-      ? hasRole("OWNER", "ADMIN")
-      : label === "Commands"
-        ? hasRole("OWNER", "ADMIN", "OPERATOR")
-        : true,
+function ProtectedRoute() {
+  const location = useLocation();
+  if (!keycloak.authenticated)
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  return <Outlet />;
+}
+
+function useRealtime() {
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<RealtimeState>("disconnected");
+  useEffect(() => {
+    if (!keycloak.authenticated) return;
+    const client = new RealtimeClient(
+      async () =>
+        (await apiRequest<{ ticket: string }>("/services/realtime/tickets"))
+          .ticket,
+      async () => {
+        await queryClient.invalidateQueries();
+      },
+      () => void queryClient.invalidateQueries(),
+      setState,
+    );
+    void client.connect().catch(() => setState("disconnected"));
+    return () => client.stop();
+  }, [queryClient]);
+  return state;
+}
+
+function AppShell() {
+  const realtime = useRealtime();
+  const visibleNavigation = useMemo(
+    () =>
+      navigation.filter(([label]) =>
+        label === "Commands" ? hasRole("OWNER", "ADMIN", "OPERATOR") : true,
+      ),
+    [],
   );
   return (
     <div className="shell">
       <header>
-        <strong>AlgaGuard</strong>
-        <span className="badge">Development · simulated data</span>
-        {keycloak.authenticated ? (
+        <div>
+          <strong>AlgaGuard</strong>
+          <span className="badge">SIMULATED development data</span>
+        </div>
+        <div className="header-actions">
+          <span className={`connection ${realtime}`}>{realtime}</span>
           <button type="button" onClick={() => void keycloak.logout()}>
             Sign out
           </button>
-        ) : null}
+        </div>
       </header>
       <aside>
         <nav aria-label="Primary">
@@ -44,102 +94,40 @@ export function App() {
         </nav>
       </aside>
       <main>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <DataPage
-                title="Overview"
-                path="/services/telemetry/devices/AG-000001/latest"
-                note="Simulated telemetry is clearly labelled until physical sensors are approved."
-              />
-            }
-          />
-          <Route
-            path="/organizations"
-            element={
-              <DataPage
-                title="Organization selection"
-                path="/services/access/organizations"
-              />
-            }
-          />
-          <Route
-            path="/devices"
-            element={
-              <DataPage
-                title="Devices"
-                path="/services/device/devices/AG-000001"
-              />
-            }
-          />
-          <Route
-            path="/devices/:id"
-            element={
-              <DataPage
-                title="Device details"
-                path="/services/device/devices/AG-000001"
-              />
-            }
-          />
-          <Route
-            path="/telemetry/live"
-            element={
-              <DataPage
-                title="Live telemetry"
-                path="/services/telemetry/devices/AG-000001/latest"
-                note="WebSocket updates recover authoritative state through HTTPS after reconnect."
-              />
-            }
-          />
-          <Route
-            path="/telemetry/history"
-            element={
-              <DataPage
-                title="Telemetry history"
-                path="/services/telemetry/devices/AG-000001/telemetry"
-              />
-            }
-          />
-          <Route
-            path="/profiles"
-            element={
-              <DataPage
-                title="Profiles and editor"
-                path="/services/profile/profiles"
-              />
-            }
-          />
-          <Route
-            path="/commands"
-            element={
-              <DataPage
-                title="Commands and progress"
-                path="/services/command/commands"
-              />
-            }
-          />
-          <Route
-            path="/ota"
-            element={
-              <DataPage
-                title="OTA releases and campaigns"
-                path="/services/ota/releases"
-              />
-            }
-          />
-          <Route
-            path="/access"
-            element={
-              <DataPage
-                title="Access management"
-                path="/services/access/organizations"
-              />
-            }
-          />
-        </Routes>
+        <Outlet />
       </main>
     </div>
   );
+}
+
+export function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppShell />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/organizations" element={<OrganizationsPage />} />
+          <Route path="/devices" element={<DevicesPage />} />
+          <Route path="/devices/:deviceUuid" element={<DeviceDetailsPage />} />
+          <Route path="/profiles" element={<ProfilesPage />} />
+          <Route path="/commands" element={<CommandPage />} />
+          <Route path="/ota" element={<OtaPage />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
+
+export function CallbackRecovery() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    void initializeAuthentication().finally(() =>
+      navigate("/dashboard", { replace: true }),
+    );
+  }, [navigate]);
+  return null;
 }
