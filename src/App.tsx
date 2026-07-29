@@ -37,8 +37,13 @@ function useRealtime() {
     if (!keycloak.authenticated) return;
     const client = new RealtimeClient(
       async () =>
-        (await apiRequest<{ ticket: string }>("/services/realtime/tickets"))
-          .ticket,
+        (
+          await apiRequest<{ ticket: string }>(
+            "/services/realtime/tickets",
+            undefined,
+            { method: "POST" },
+          )
+        ).ticket,
       async () => {
         await queryClient.invalidateQueries();
       },

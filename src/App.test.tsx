@@ -66,6 +66,18 @@ describe("dashboard demo", () => {
     view.queryClient.clear();
   });
 
+  it("requests a one-time realtime ticket with POST", async () => {
+    const view = renderApp();
+    await vi.waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/services/realtime/tickets"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    view.unmount();
+    view.queryClient.clear();
+  });
+
   it("requires confirmation before an indicator command can be created", () => {
     const view = renderApp("/commands");
     const submit = screen.getByRole("button", { name: "Create command" });
