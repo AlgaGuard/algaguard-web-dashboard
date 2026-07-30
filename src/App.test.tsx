@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { keycloak } from "./auth";
+import { organizationTelemetrySubscriptions } from "./realtime";
 
 function renderApp(path = "/dashboard") {
   const queryClient = new QueryClient({
@@ -74,6 +75,32 @@ describe("dashboard demo", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("uses the canonical telemetry event for an organization subscription", () => {
+    const subscriptions = organizationTelemetrySubscriptions(
+      "10000000-0000-4000-8000-000000000001",
+    );
+    expect(subscriptions[0]?.events).toEqual(["telemetry.updated"]);
+    expect(JSON.stringify(subscriptions)).not.toContain("device.telemetry");
+  });
+
+  it("labels simulated data and exposes all six parameter cards", async () => {
+    const view = renderApp();
+    expect(screen.getAllByText(/simulated demo data/i).length).toBeGreaterThan(
+      0,
+    );
+    for (const label of [
+      "Temperature",
+      "pH",
+      "Light",
+      "Nitrate",
+      "Phosphate",
+      "Potassium",
+    ])
+      expect(await screen.findByText(label)).toBeInTheDocument();
     view.unmount();
     view.queryClient.clear();
   });

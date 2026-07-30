@@ -14,7 +14,11 @@ import {
   OtaPage,
   ProfilesPage,
 } from "./pages";
-import { RealtimeClient, type RealtimeState } from "./realtime";
+import {
+  organizationTelemetrySubscriptions,
+  RealtimeClient,
+  type RealtimeState,
+} from "./realtime";
 
 const navigation = [
   ["Dashboard", "/dashboard"],
@@ -47,8 +51,23 @@ function useRealtime() {
       async () => {
         await queryClient.invalidateQueries();
       },
-      () => void queryClient.invalidateQueries(),
+      (value) => {
+        if (
+          value &&
+          typeof value === "object" &&
+          (value as Record<string, unknown>).eventType === "telemetry.updated"
+        )
+          void queryClient.invalidateQueries({ queryKey: ["telemetry"] });
+      },
       setState,
+      async () => {
+        const response = await apiRequest<{ items: Array<{ id: string }> }>(
+          "/services/access/organizations",
+        );
+        if (response.items.length !== 1)
+          throw new Error("Organization context unavailable");
+        return organizationTelemetrySubscriptions(response.items[0]!.id);
+      },
     );
     void client.connect().catch(() => setState("disconnected"));
     return () => client.stop();
@@ -57,6 +76,7 @@ function useRealtime() {
 }
 
 function AppShell({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const realtime = useRealtime();
   const visibleNavigation = useMemo(
     () =>
@@ -70,11 +90,17 @@ function AppShell({ children }: { children: ReactNode }) {
       <header>
         <div>
           <strong>AlgaGuard</strong>
-          <span className="badge">SIMULATED development data</span>
+          <span className="badge">Simulated demo data</span>
         </div>
         <div className="header-actions">
           <span className={`connection ${realtime}`}>{realtime}</span>
-          <button type="button" onClick={() => void keycloak.logout()}>
+          <button
+            type="button"
+            onClick={() => {
+              queryClient.clear();
+              void keycloak.logout();
+            }}
+          >
             Sign out
           </button>
         </div>

@@ -1,6 +1,22 @@
 export type RealtimeState =
   "disconnected" | "connecting" | "connected" | "recovering";
 
+export function organizationTelemetrySubscriptions(organizationId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId))
+    throw new Error("Organization context unavailable");
+  return [
+    {
+      resourceType: "organization" as const,
+      resourceId: organizationId,
+      events: ["telemetry.updated"],
+    },
+    {
+      resourceType: "current-user" as const,
+      events: ["system.notification"],
+    },
+  ];
+}
+
 export class RealtimeClient {
   private socket?: WebSocket;
   private attempt = 0;
@@ -10,6 +26,15 @@ export class RealtimeClient {
     private readonly recover: () => Promise<void>,
     private readonly onEvent: (value: unknown) => void,
     private readonly onState: (state: RealtimeState) => void,
+    private readonly subscriptions: () => Promise<
+      Array<{
+        resourceType: "organization" | "device" | "current-user";
+        resourceId?: string;
+        events: string[];
+      }>
+    > = async () => [
+      { resourceType: "current-user", events: ["system.notification"] },
+    ],
   ) {}
   async connect() {
     this.stopped = false;
@@ -27,17 +52,7 @@ export class RealtimeClient {
           schema: "algaguard.websocket.subscribe",
           schemaVersion: "1.0.0",
           requestId: crypto.randomUUID(),
-          subscriptions: [
-            {
-              resourceType: "current-user",
-              events: [
-                "system.notification",
-                "device.telemetry",
-                "command.status",
-                "ota.status",
-              ],
-            },
-          ],
+          subscriptions: await this.subscriptions(),
         }),
       );
       this.onState("connected");

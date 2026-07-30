@@ -9,6 +9,8 @@ const asRecords = (value: unknown): Json[] =>
   Array.isArray(value)
     ? value.filter((item): item is Json => !!item && typeof item === "object")
     : [];
+const responseItems = (value: unknown): Json[] =>
+  asRecords(record(value).items);
 const record = (value: unknown): Json =>
   value && typeof value === "object" ? (value as Json) : {};
 const text = (value: unknown) =>
@@ -64,12 +66,17 @@ function ValueCard({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-function usePlatformQuery<T = unknown>(key: string, path: string) {
+function usePlatformQuery<T = unknown>(
+  key: string,
+  path: string,
+  enabled = true,
+) {
   return useQuery({
     queryKey: [key],
     queryFn: () => apiRequest<T>(path),
     retry: false,
     refetchInterval: 30_000,
+    enabled,
   });
 }
 
@@ -119,14 +126,26 @@ export function AuthCallbackPage() {
 
 export function DashboardPage() {
   const devices = usePlatformQuery("devices", "/services/device/devices");
+  const list = responseItems(devices.data);
+  const demoDevice = list.find(
+    (device) =>
+      typeof device.deviceUuid === "string" && device.lifecycle !== "UNCLAIMED",
+  );
   const latest = usePlatformQuery(
-    "latest",
-    "/services/telemetry/devices/AG-000001/latest",
+    "telemetry",
+    demoDevice
+      ? `/services/telemetry/devices/${encodeURIComponent(String(demoDevice.deviceUuid))}/latest`
+      : "",
+    !!demoDevice,
   );
   const commands = usePlatformQuery("commands", "/services/command/commands");
   const ota = usePlatformQuery("ota", "/services/ota/releases");
-  const telemetry = record(latest.data);
-  const list = asRecords(devices.data);
+  const telemetry = record(record(latest.data).latest);
+  const values = record(telemetry.values);
+  const simulated =
+    asRecords(telemetry.qualityFlags).length > 0 ||
+    (Array.isArray(telemetry.qualityFlags) &&
+      telemetry.qualityFlags.includes("SIMULATED"));
   const online = list.filter(
     (device) => device.status === "ONLINE" || device.online === true,
   ).length;
@@ -142,6 +161,7 @@ export function DashboardPage() {
         />
       </div>
       <h2>Latest simulated telemetry</h2>
+      {simulated ? <p className="badge">Simulated demo data</p> : null}
       {latest.isLoading ? (
         <Loading />
       ) : latest.isError ? (
@@ -150,27 +170,50 @@ export function DashboardPage() {
         <div className="cards telemetry">
           <ValueCard
             label="Temperature"
-            value={telemetry.temperatureC ?? telemetry.temperature_c}
+            value={
+              values.temperatureC == null
+                ? undefined
+                : `${text(values.temperatureC)} °C`
+            }
           />
-          <ValueCard label="pH" value={telemetry.ph} />
+          <ValueCard label="pH" value={values.ph} />
           <ValueCard
             label="Light"
-            value={telemetry.lightLux ?? telemetry.light_lux}
+            value={
+              values.lightLux == null
+                ? undefined
+                : `${text(values.lightLux)} lux`
+            }
           />
           <ValueCard
             label="Nitrate"
-            value={telemetry.nitrateMgL ?? telemetry.nitrate_mg_l}
+            value={
+              values.nitrateMgL == null
+                ? undefined
+                : `${text(values.nitrateMgL)} mg/L`
+            }
           />
           <ValueCard
             label="Phosphate"
-            value={telemetry.phosphateMgL ?? telemetry.phosphate_mg_l}
+            value={
+              values.phosphateMgL == null
+                ? undefined
+                : `${text(values.phosphateMgL)} mg/L`
+            }
           />
           <ValueCard
             label="Potassium"
-            value={telemetry.potassiumMgL ?? telemetry.potassium_mg_l}
+            value={
+              values.potassiumMgL == null
+                ? undefined
+                : `${text(values.potassiumMgL)} mg/L`
+            }
           />
         </div>
       )}
+      {typeof telemetry.observedAt === "string" ? (
+        <p>Last updated {new Date(telemetry.observedAt).toLocaleString()}</p>
+      ) : null}
       <div className="two-column">
         <Summary title="Recent commands" query={commands} />
         <Summary title="Development OTA releases" query={ota} />
@@ -321,7 +364,7 @@ export function DeviceDetailsPage() {
     `/services/telemetry/devices/${encodeURIComponent(deviceUuid)}/telemetry`,
   );
   const status = record(device.data);
-  const history = asRecords(telemetry.data);
+  const history = responseItems(telemetry.data);
   return (
     <Page
       title={`Device ${text(status.deviceId ?? deviceUuid)}`}
@@ -368,7 +411,7 @@ export function DeviceDetailsPage() {
                 <span
                   key={String(sample.sequence ?? index)}
                   style={{
-                    height: `${Math.max(8, Math.min(100, Number(sample.lightLux ?? sample.light_lux ?? 0) / 12))}%`,
+                    height: `${Math.max(8, Math.min(100, Number(record(sample.values).lightLux ?? 0) / 12))}%`,
                   }}
                   title={`Sequence ${text(sample.sequence)}`}
                 />
