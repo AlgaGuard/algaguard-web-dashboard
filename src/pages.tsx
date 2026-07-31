@@ -83,6 +83,11 @@ function usePlatformQuery<T = unknown>(
 export function LoginPage() {
   return (
     <section className="login">
+      <img
+        className="login-logo"
+        src="/brand/algaguard-logo.png"
+        alt="AlgaGuard shield logo"
+      />
       <h1>Sign in to AlgaGuard</h1>
       <p>
         Use the configured local Keycloak realm. Tokens are managed by Keycloak

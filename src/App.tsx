@@ -88,7 +88,8 @@ function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <header>
-        <div>
+        <div className="brand-lockup">
+          <img src="/brand/algaguard-32.png" alt="AlgaGuard shield logo" />
           <strong>AlgaGuard</strong>
           <span className="badge">Simulated demo data</span>
         </div>

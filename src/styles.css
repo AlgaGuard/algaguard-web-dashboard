@@ -43,6 +43,16 @@ header {
   background: #073b3a;
   color: white;
 }
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.brand-lockup img {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+}
 header strong {
   font-size: 1.25rem;
   margin-right: 0.75rem;
@@ -214,6 +224,12 @@ td {
   background: #fff;
   border: 1px solid #c7d8d6;
   border-radius: 0.75rem;
+}
+.login-logo {
+  display: block;
+  width: min(11rem, 45vw);
+  height: auto;
+  margin: 0 auto 1.25rem;
 }
 @media (max-width: 760px) {
   .shell {
