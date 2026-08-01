@@ -3,6 +3,7 @@ import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
 import { hasRole, initializeAuthentication, keycloak } from "./auth";
+import { OrganizationProvider, useOrganization } from "./organization";
 import {
   AuthCallbackPage,
   CommandPage,
@@ -34,11 +35,11 @@ function ProtectedPage({ children }: { children: ReactNode }) {
   return <AppShell>{children}</AppShell>;
 }
 
-function useRealtime() {
+function useRealtime(organizationId?: string) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<RealtimeState>("disconnected");
   useEffect(() => {
-    if (!keycloak.authenticated) return;
+    if (!keycloak.authenticated || !organizationId) return;
     const client = new RealtimeClient(
       async () =>
         (
@@ -60,24 +61,18 @@ function useRealtime() {
           void queryClient.invalidateQueries({ queryKey: ["telemetry"] });
       },
       setState,
-      async () => {
-        const response = await apiRequest<{ items: Array<{ id: string }> }>(
-          "/services/access/organizations",
-        );
-        if (response.items.length !== 1)
-          throw new Error("Organization context unavailable");
-        return organizationTelemetrySubscriptions(response.items[0]!.id);
-      },
+      async () => organizationTelemetrySubscriptions(organizationId),
     );
     void client.connect().catch(() => setState("disconnected"));
     return () => client.stop();
-  }, [queryClient]);
+  }, [organizationId, queryClient]);
   return state;
 }
 
 function AppShell({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const realtime = useRealtime();
+  const organization = useOrganization();
+  const realtime = useRealtime(organization.selectedOrganizationId);
   const visibleNavigation = useMemo(
     () =>
       navigation.filter(([label]) =>
@@ -97,6 +92,7 @@ function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => {
+              organization.clearOrganization();
               queryClient.clear();
               void keycloak.logout();
             }}
@@ -121,51 +117,53 @@ function AppShell({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
-    <Switch>
-      <Route path="/login" component={LoginPage} />
-      <Route path="/auth/callback" component={AuthCallbackPage} />
-      <Route path="/dashboard">
-        <ProtectedPage>
-          <DashboardPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/organizations">
-        <ProtectedPage>
-          <OrganizationsPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/devices/:deviceUuid">
-        <ProtectedPage>
-          <DeviceDetailsPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/devices">
-        <ProtectedPage>
-          <DevicesPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/profiles">
-        <ProtectedPage>
-          <ProfilesPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/commands">
-        <ProtectedPage>
-          <CommandPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/ota">
-        <ProtectedPage>
-          <OtaPage />
-        </ProtectedPage>
-      </Route>
-      <Route path="/">
-        <Redirect to="/dashboard" replace />
-      </Route>
-      <Route>
-        <Redirect to="/dashboard" replace />
-      </Route>
-    </Switch>
+    <OrganizationProvider>
+      <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route path="/auth/callback" component={AuthCallbackPage} />
+        <Route path="/dashboard">
+          <ProtectedPage>
+            <DashboardPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/organizations">
+          <ProtectedPage>
+            <OrganizationsPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/devices/:deviceUuid">
+          <ProtectedPage>
+            <DeviceDetailsPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/devices">
+          <ProtectedPage>
+            <DevicesPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/profiles">
+          <ProtectedPage>
+            <ProfilesPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/commands">
+          <ProtectedPage>
+            <CommandPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/ota">
+          <ProtectedPage>
+            <OtaPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/">
+          <Redirect to="/dashboard" replace />
+        </Route>
+        <Route>
+          <Redirect to="/dashboard" replace />
+        </Route>
+      </Switch>
+    </OrganizationProvider>
   );
 }
 

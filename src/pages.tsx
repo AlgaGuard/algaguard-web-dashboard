@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
 import { initializeAuthentication, keycloak } from "./auth";
+import { useOrganization } from "./organization";
 
 type Json = Record<string, unknown>;
 const asRecords = (value: unknown): Json[] =>
@@ -72,7 +73,7 @@ function usePlatformQuery<T = unknown>(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: [key],
+    queryKey: [key, path],
     queryFn: () => apiRequest<T>(path),
     retry: false,
     refetchInterval: 30_000,
@@ -125,7 +126,14 @@ export function AuthCallbackPage() {
 }
 
 export function DashboardPage() {
-  const devices = usePlatformQuery("devices", "/services/device/devices");
+  const { selectedOrganizationId } = useOrganization();
+  const devices = usePlatformQuery(
+    "devices",
+    selectedOrganizationId
+      ? `/services/device/devices?organizationId=${encodeURIComponent(selectedOrganizationId)}`
+      : "",
+    !!selectedOrganizationId,
+  );
   const list = responseItems(devices.data);
   const demoDevice = list.find(
     (device) =>
@@ -255,26 +263,27 @@ function Summary({
 }
 
 export function OrganizationsPage() {
-  const organizations = usePlatformQuery(
-    "organizations",
-    "/services/access/organizations",
-  );
-  const [active, setActive] = useState<string | undefined>();
-  const values = asRecords(organizations.data);
+  const {
+    organizations: values,
+    selectedOrganizationId: active,
+    selectOrganization,
+    loading,
+    error,
+  } = useOrganization();
   return (
     <Page title="Organizations">
       <p>
         Select an organization authorized by the current membership. Revoked
         memberships are shown as unavailable and cannot become active.
       </p>
-      {organizations.isLoading ? (
+      {loading ? (
         <Loading />
-      ) : organizations.isError ? (
-        <ErrorState error={organizations.error} />
+      ) : error ? (
+        <ErrorState error={new Error("Authorized organizations unavailable")} />
       ) : values.length ? (
         <div className="list">
           {values.map((organization, index) => {
-            const id = text(organization.organizationId ?? organization.id);
+            const id = organization.organizationId;
             const revoked =
               organization.revoked === true ||
               organization.status === "REVOKED";
@@ -284,9 +293,11 @@ export function OrganizationsPage() {
                 disabled={revoked}
                 key={id}
                 type="button"
-                onClick={() => setActive(id)}
+                onClick={() => selectOrganization(id)}
               >
-                <strong>{text(organization.name ?? id)}</strong>
+                <strong>
+                  {text(organization.name ?? "Authorized organization")}
+                </strong>
                 <span>
                   {revoked
                     ? "Access revoked"
@@ -306,12 +317,22 @@ export function OrganizationsPage() {
 }
 
 export function DevicesPage() {
-  const devices = usePlatformQuery("devices", "/services/device/devices");
-  const values = asRecords(devices.data);
+  const { selectedOrganizationId, loading: organizationLoading } =
+    useOrganization();
+  const devices = usePlatformQuery(
+    "devices",
+    selectedOrganizationId
+      ? `/services/device/devices?organizationId=${encodeURIComponent(selectedOrganizationId)}`
+      : "",
+    !!selectedOrganizationId,
+  );
+  const values = responseItems(devices.data);
   return (
     <Page title="Devices">
-      {devices.isLoading ? (
+      {organizationLoading || devices.isLoading ? (
         <Loading />
+      ) : !selectedOrganizationId ? (
+        <Empty>Select an authorized organization first.</Empty>
       ) : devices.isError ? (
         <ErrorState error={devices.error} />
       ) : values.length ? (
@@ -427,16 +448,26 @@ export function DeviceDetailsPage() {
 }
 
 export function ProfilesPage() {
-  const profiles = usePlatformQuery("profiles", "/services/profile/profiles");
-  const values = asRecords(profiles.data);
+  const { selectedOrganizationId, loading: organizationLoading } =
+    useOrganization();
+  const profiles = usePlatformQuery(
+    "profiles",
+    selectedOrganizationId
+      ? `/services/profile/profiles?organizationId=${encodeURIComponent(selectedOrganizationId)}`
+      : "",
+    !!selectedOrganizationId,
+  );
+  const values = responseItems(profiles.data);
   return (
     <Page title="Profiles">
       <p className="notice">
         Profile values in this demo are user-defined and are not scientifically
         approved.
       </p>
-      {profiles.isLoading ? (
+      {organizationLoading || profiles.isLoading ? (
         <Loading />
+      ) : !selectedOrganizationId ? (
+        <Empty>Select an authorized organization first.</Empty>
       ) : profiles.isError ? (
         <ErrorState error={profiles.error} />
       ) : values.length ? (

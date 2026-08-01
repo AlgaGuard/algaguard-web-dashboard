@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -22,13 +22,50 @@ describe("dashboard demo", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify([]), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          }),
-      ),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/services/access/organizations")
+          ? {
+              items: [
+                {
+                  id: "10000000-0000-4000-8000-000000000001",
+                  name: "Development organization",
+                },
+              ],
+            }
+          : url.includes("/services/device/devices")
+            ? {
+                items: [
+                  {
+                    deviceUuid: "20000000-0000-4000-8000-000000000001",
+                    deviceId: "AG-999999",
+                    lifecycle: "ACTIVE",
+                    status: "ONLINE",
+                  },
+                ],
+              }
+            : url.includes("/services/realtime/tickets")
+              ? { ticket: "synthetic-test-ticket" }
+              : url.includes("/services/telemetry/devices/")
+                ? {
+                    latest: {
+                      source: "SIMULATED_DEMO",
+                      values: {
+                        temperatureC: 24.5,
+                        ph: 7.2,
+                        lightLux: 600,
+                        nitrateMgL: 2.1,
+                        phosphateMgL: 0.4,
+                        potassiumMgL: 3.2,
+                      },
+                    },
+                  }
+                : [];
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
     );
     Object.defineProperty(keycloak, "authenticated", {
       configurable: true,
@@ -39,7 +76,10 @@ describe("dashboard demo", () => {
       value: "test-token",
     });
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it("protects dashboard navigation when signed out", () => {
     Object.defineProperty(keycloak, "authenticated", {
@@ -79,6 +119,24 @@ describe("dashboard demo", () => {
     view.queryClient.clear();
   });
 
+  it("scopes device requests to the authorized organization", async () => {
+    const view = renderApp("/devices");
+    await vi.waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "/services/device/devices?organizationId=10000000-0000-4000-8000-000000000001",
+        ),
+        expect.any(Object),
+      ),
+    );
+    expect(
+      screen.queryByText(/Request failed with 400/i),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByText("AG-999999")).toBeInTheDocument();
+    view.unmount();
+    view.queryClient.clear();
+  });
+
   it("uses the canonical telemetry event for an organization subscription", () => {
     const subscriptions = organizationTelemetrySubscriptions(
       "10000000-0000-4000-8000-000000000001",
@@ -92,15 +150,17 @@ describe("dashboard demo", () => {
     expect(screen.getAllByText(/simulated demo data/i).length).toBeGreaterThan(
       0,
     );
-    for (const label of [
-      "Temperature",
-      "pH",
-      "Light",
-      "Nitrate",
-      "Phosphate",
-      "Potassium",
-    ])
-      expect(await screen.findByText(label)).toBeInTheDocument();
+    await vi.waitFor(() => {
+      for (const label of [
+        "Temperature",
+        "pH",
+        "Light",
+        "Nitrate",
+        "Phosphate",
+        "Potassium",
+      ])
+        expect(screen.getByText(label)).toBeInTheDocument();
+    });
     view.unmount();
     view.queryClient.clear();
   });
