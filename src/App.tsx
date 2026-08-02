@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
 import { hasRole, initializeAuthentication, keycloak } from "./auth";
 import { OrganizationProvider, useOrganization } from "./organization";
+import "./brand.css";
 import {
   AuthCallbackPage,
   CommandPage,
@@ -83,7 +84,8 @@ function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <header>
-        <div>
+        <div className="brand-lockup">
+          <img src="/algaguard-logo.png" alt="AlgaGuard" />
           <strong>AlgaGuard</strong>
           <span className="badge">Simulated demo data</span>
         </div>

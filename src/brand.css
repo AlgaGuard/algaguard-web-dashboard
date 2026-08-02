@@ -1,0 +1,24 @@
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.brand-lockup img {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.5rem;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.brand-lockup strong {
+  margin-right: 0.1rem;
+}
+
+@media (max-width: 40rem) {
+  .brand-lockup .badge {
+    display: none;
+  }
+}
