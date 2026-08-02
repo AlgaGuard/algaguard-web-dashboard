@@ -6,6 +6,49 @@ import { initializeAuthentication, keycloak } from "./auth";
 import { useOrganization } from "./organization";
 
 type Json = Record<string, unknown>;
+const thresholdFields = [
+  ["temperatureC", "Temperature"],
+  ["ph", "pH"],
+  ["lightLux", "Light intensity"],
+  ["nitrateMgL", "Nitrate"],
+  ["phosphateMgL", "Phosphate"],
+  ["potassiumMgL", "Potassium"],
+] as const;
+type ThresholdKey = (typeof thresholdFields)[number][0];
+type ThresholdInputs = Partial<
+  Record<`${ThresholdKey}Min` | `${ThresholdKey}Max`, string>
+>;
+
+function profileConfiguration(inputs: ThresholdInputs): Json {
+  const thresholds: Json = {};
+  for (const [key] of thresholdFields) {
+    const minimum = inputs[`${key}Min`];
+    const maximum = inputs[`${key}Max`];
+    if (!minimum?.trim() && !maximum?.trim()) continue;
+    const lower = minimum?.trim() ? Number(minimum) : undefined;
+    const upper = maximum?.trim() ? Number(maximum) : undefined;
+    if (
+      (lower !== undefined && !Number.isFinite(lower)) ||
+      (upper !== undefined && !Number.isFinite(upper)) ||
+      (lower !== undefined && upper !== undefined && lower > upper)
+    )
+      throw new Error("Each threshold must be finite and have a valid range");
+    thresholds[key] = {
+      ...(lower === undefined ? {} : { min: lower }),
+      ...(upper === undefined ? {} : { max: upper }),
+    };
+  }
+  return { status: "DRAFT", thresholds };
+}
+
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  );
+}
 const asRecords = (value: unknown): Json[] =>
   Array.isArray(value)
     ? value.filter((item): item is Json => !!item && typeof item === "object")
@@ -388,6 +431,7 @@ export function DeviceDetailsPage() {
   const { selectedOrganizationId } = useOrganization();
   const [deviceName, setDeviceName] = useState("");
   const [profileName, setProfileName] = useState("");
+  const [thresholdInputs, setThresholdInputs] = useState<ThresholdInputs>({});
   const device = usePlatformQuery(
     `device:${deviceUuid}`,
     `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
@@ -435,6 +479,7 @@ export function DeviceDetailsPage() {
           String(profile.name ?? "").toLocaleLowerCase() ===
           normalizedProfileName.toLocaleLowerCase(),
       );
+      const configuration = profileConfiguration(thresholdInputs);
       const profile =
         existing ??
         (await apiRequest<Json>("/services/profile/profiles", undefined, {
@@ -442,19 +487,55 @@ export function DeviceDetailsPage() {
           body: JSON.stringify({
             organizationId: selectedOrganizationId,
             name: normalizedProfileName,
-            configuration: { status: "DRAFT", thresholds: {} },
+            configuration,
           }),
         }));
+      const profileId = profile.profileId;
       const current = record(profile.current);
-      await apiRequest(
-        `/services/profile/devices/${encodeURIComponent(String(status.deviceId))}/profile-assignment`,
+      const profileVersion = existing
+        ? await apiRequest<Json>(
+            `/services/profile/profiles/${encodeURIComponent(String(profileId))}/versions`,
+            undefined,
+            { method: "POST", body: JSON.stringify(configuration) },
+          )
+        : current;
+      const version = Number(profileVersion.version);
+      const deviceId = String(status.deviceId ?? "");
+      if (
+        !isUuid(profileId) ||
+        !Number.isInteger(version) ||
+        version < 1 ||
+        !/^AG-[0-9]{6}$/.test(deviceId)
+      )
+        throw new Error("Profile activation data is invalid");
+      const assignment = await apiRequest<Json>(
+        `/services/profile/devices/${encodeURIComponent(deviceId)}/profile-assignment`,
         undefined,
         {
           method: "PUT",
           body: JSON.stringify({
             organizationId: selectedOrganizationId,
-            profileId: profile.profileId,
-            version: current.version,
+            profileId,
+            version,
+          }),
+        },
+      );
+      if (!isUuid(assignment.id))
+        throw new Error("Profile assignment was not accepted");
+      await apiRequest(
+        `/services/command/devices/${encodeURIComponent(deviceId)}/commands`,
+        undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            commandId: crypto.randomUUID(),
+            commandType: "APPLY_PROFILE_CONFIGURATION",
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+            parameters: {
+              configurationId: assignment.id,
+              profileId,
+              profileVersion: `${version}.0.0`,
+            },
           }),
         },
       );
@@ -557,8 +638,48 @@ export function DeviceDetailsPage() {
                 onChange={(event) => setProfileName(event.target.value)}
               />
             </label>
+            <fieldset>
+              <legend>User-defined profile thresholds</legend>
+              <p className="notice">
+                Optional values are stored in this profile only; they are not
+                scientifically approved alert recommendations.
+              </p>
+              {thresholdFields.map(([key, label]) => (
+                <div className="two-column" key={key}>
+                  <label>
+                    {label} minimum
+                    <input
+                      inputMode="decimal"
+                      type="number"
+                      value={thresholdInputs[`${key}Min`] ?? ""}
+                      onChange={(event) =>
+                        setThresholdInputs((current) => ({
+                          ...current,
+                          [`${key}Min`]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    {label} maximum
+                    <input
+                      inputMode="decimal"
+                      type="number"
+                      value={thresholdInputs[`${key}Max`] ?? ""}
+                      onChange={(event) =>
+                        setThresholdInputs((current) => ({
+                          ...current,
+                          [`${key}Max`]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              ))}
+            </fieldset>
             <p className="notice">
-              A new profile starts as a draft without scientific thresholds.
+              Saving creates or versions the profile, assigns it, and queues one
+              activation command for this device.
             </p>
             <button disabled={setup.isPending} type="submit">
               {setup.isPending ? "Savingâ€¦" : "Save device setup"}
@@ -601,10 +722,21 @@ export function ProfilesPage() {
   );
   const values = responseItems(profiles.data);
   return (
-    <Page title="Profiles">
+    <Page
+      title="Profiles"
+      actions={
+        <Link className="button-link" to="/devices">
+          Create and assign from a device
+        </Link>
+      }
+    >
       <p className="notice">
         Profile values in this demo are user-defined and are not scientifically
         approved.
+      </p>
+      <p>
+        Open a device to create or version its profile, set optional thresholds,
+        and send one activation command.
       </p>
       {organizationLoading || profiles.isLoading ? (
         <Loading />
