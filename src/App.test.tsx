@@ -137,6 +137,48 @@ describe("dashboard demo", () => {
     view.queryClient.clear();
   });
 
+  it("shows device naming, profile setup, and confirmed removal controls", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/services/access/organizations")
+          ? {
+              items: [
+                {
+                  id: "10000000-0000-4000-8000-000000000001",
+                  name: "Development organization",
+                },
+              ],
+            }
+          : url.includes("/services/telemetry/devices/")
+            ? { items: [] }
+            : {
+                deviceUuid: "20000000-0000-4000-8000-000000000001",
+                deviceId: "AG-999999",
+                displayName: "North tank",
+                lifecycle: "ACTIVE",
+              };
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    const view = renderApp("/devices/20000000-0000-4000-8000-000000000001");
+    expect(await screen.findByDisplayValue("North tank")).toBeInTheDocument();
+    expect(screen.getByLabelText("Profile name")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save device setup" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove device" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/preserving audit history/i)).toBeInTheDocument();
+    view.unmount();
+    view.queryClient.clear();
+  });
+
   it("uses the canonical telemetry event for an organization subscription", () => {
     const subscriptions = organizationTelemetrySubscriptions(
       "10000000-0000-4000-8000-000000000001",

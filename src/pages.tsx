@@ -340,7 +340,7 @@ export function DevicesPage() {
           <table>
             <thead>
               <tr>
-                <th>Device ID</th>
+                <th>Device</th>
                 <th>Status</th>
                 <th>Profile</th>
                 <th>Last seen</th>
@@ -352,7 +352,14 @@ export function DevicesPage() {
                 const uuid = text(device.deviceUuid ?? device.id);
                 return (
                   <tr key={uuid}>
-                    <td>{text(device.deviceId)}</td>
+                    <td>
+                      <strong>
+                        {text(device.displayName ?? device.deviceId)}
+                      </strong>
+                      {device.displayName ? (
+                        <small>{text(device.deviceId)}</small>
+                      ) : null}
+                    </td>
                     <td>{text(device.status)}</td>
                     <td>{text(device.profileName ?? device.profileId)}</td>
                     <td>{text(device.lastSeenAt ?? device.lastSeen)}</td>
@@ -376,6 +383,11 @@ export function DevicesPage() {
 
 export function DeviceDetailsPage() {
   const { deviceUuid = "" } = useParams();
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const { selectedOrganizationId } = useOrganization();
+  const [deviceName, setDeviceName] = useState("");
+  const [profileName, setProfileName] = useState("");
   const device = usePlatformQuery(
     `device:${deviceUuid}`,
     `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
@@ -386,9 +398,87 @@ export function DeviceDetailsPage() {
   );
   const status = record(device.data);
   const history = responseItems(telemetry.data);
+  useEffect(() => {
+    if (!deviceName && typeof status.displayName === "string") {
+      setDeviceName(status.displayName);
+    }
+    if (!profileName && typeof status.deviceId === "string") {
+      setProfileName(
+        `${String(status.displayName ?? status.deviceId)} profile`,
+      );
+    }
+  }, [deviceName, profileName, status.displayName, status.deviceId]);
+  const setup = useMutation({
+    mutationFn: async () => {
+      const normalizedDeviceName = deviceName.trim();
+      const normalizedProfileName = profileName.trim();
+      if (
+        !selectedOrganizationId ||
+        !normalizedDeviceName ||
+        !normalizedProfileName
+      ) {
+        throw new Error("Device and profile names are required");
+      }
+      await apiRequest(
+        `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
+        undefined,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ displayName: normalizedDeviceName }),
+        },
+      );
+      const profileResponse = await apiRequest<Json>(
+        `/services/profile/profiles?organizationId=${encodeURIComponent(selectedOrganizationId)}`,
+      );
+      const existing = responseItems(profileResponse).find(
+        (profile) =>
+          String(profile.name ?? "").toLocaleLowerCase() ===
+          normalizedProfileName.toLocaleLowerCase(),
+      );
+      const profile =
+        existing ??
+        (await apiRequest<Json>("/services/profile/profiles", undefined, {
+          method: "POST",
+          body: JSON.stringify({
+            organizationId: selectedOrganizationId,
+            name: normalizedProfileName,
+            configuration: { status: "DRAFT", thresholds: {} },
+          }),
+        }));
+      const current = record(profile.current);
+      await apiRequest(
+        `/services/profile/devices/${encodeURIComponent(String(status.deviceId))}/profile-assignment`,
+        undefined,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            organizationId: selectedOrganizationId,
+            profileId: profile.profileId,
+            version: current.version,
+          }),
+        },
+      );
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({
+        queryKey: [`device:${deviceUuid}`],
+      }),
+  });
+  const remove = useMutation({
+    mutationFn: () =>
+      apiRequest(
+        `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
+        undefined,
+        {
+          method: "DELETE",
+          body: JSON.stringify({ confirmation: "REMOVE" }),
+        },
+      ),
+    onSuccess: () => navigate("/devices"),
+  });
   return (
     <Page
-      title={`Device ${text(status.deviceId ?? deviceUuid)}`}
+      title={text(status.displayName ?? status.deviceId ?? deviceUuid)}
       actions={
         <Link className="button-link" to="/commands">
           Send safe command
@@ -441,6 +531,58 @@ export function DeviceDetailsPage() {
           ) : (
             <Empty>No telemetry history is available.</Empty>
           )}
+          <h2>Device setup</h2>
+          <form
+            className="panel form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setup.mutate();
+            }}
+          >
+            <label>
+              Device name
+              <input
+                maxLength={64}
+                required
+                value={deviceName}
+                onChange={(event) => setDeviceName(event.target.value)}
+              />
+            </label>
+            <label>
+              Profile name
+              <input
+                maxLength={120}
+                required
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+              />
+            </label>
+            <p className="notice">
+              A new profile starts as a draft without scientific thresholds.
+            </p>
+            <button disabled={setup.isPending} type="submit">
+              {setup.isPending ? "Savingâ€¦" : "Save device setup"}
+            </button>
+            {setup.isError ? <ErrorState error={setup.error} /> : null}
+          </form>
+          <section className="panel">
+            <h2>Remove device</h2>
+            <p>Removal revokes cloud access while preserving audit history.</p>
+            <button
+              disabled={remove.isPending}
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm("Remove this device from the organization?")
+                ) {
+                  remove.mutate();
+                }
+              }}
+            >
+              Remove device
+            </button>
+            {remove.isError ? <ErrorState error={remove.error} /> : null}
+          </section>
         </>
       )}
     </Page>
