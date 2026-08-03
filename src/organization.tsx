@@ -30,6 +30,23 @@ const OrganizationContext = createContext<OrganizationContextValue | null>(
   null,
 );
 
+const storageKey = "algaguard.selectedOrganizationId";
+function readStoredOrganizationId(): string | undefined {
+  try {
+    return localStorage.getItem(storageKey) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+function writeStoredOrganizationId(organizationId: string | undefined) {
+  try {
+    if (organizationId) localStorage.setItem(storageKey, organizationId);
+    else localStorage.removeItem(storageKey);
+  } catch {
+    /* storage unavailable; selection just won't persist across reloads */
+  }
+}
+
 function authorizedOrganizations(value: unknown): AuthorizedOrganization[] {
   if (!value || typeof value !== "object") return [];
   const items = (value as { items?: unknown }).items;
@@ -74,7 +91,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   );
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<
     string | undefined
-  >();
+  >(readStoredOrganizationId);
 
   useEffect(() => {
     if (!keycloak.authenticated) {
@@ -89,9 +106,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       )
     )
       return;
-    setSelectedOrganizationId(
-      organizations.length === 1 ? organizations[0]!.organizationId : undefined,
-    );
+    const next =
+      organizations.length === 1 ? organizations[0]!.organizationId : undefined;
+    setSelectedOrganizationId(next);
+    writeStoredOrganizationId(next);
   }, [organizations, selectedOrganizationId]);
 
   const value = useMemo<OrganizationContextValue>(
@@ -105,10 +123,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           organizations.some(
             (organization) => organization.organizationId === organizationId,
           )
-        )
+        ) {
           setSelectedOrganizationId(organizationId);
+          writeStoredOrganizationId(organizationId);
+        }
       },
-      clearOrganization: () => setSelectedOrganizationId(undefined),
+      clearOrganization: () => {
+        setSelectedOrganizationId(undefined);
+        writeStoredOrganizationId(undefined);
+      },
     }),
     [organizations, query.isError, query.isLoading, selectedOrganizationId],
   );

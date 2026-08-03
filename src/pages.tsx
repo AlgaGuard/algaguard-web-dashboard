@@ -333,6 +333,127 @@ function Summary({
   );
 }
 
+export function OverviewPage() {
+  const { organizations, loading: organizationLoading } = useOrganization();
+  const organizationIds = organizations
+    .map((organization) => organization.organizationId)
+    .sort()
+    .join(",");
+  const overview = useQuery({
+    queryKey: ["overview", organizationIds],
+    queryFn: async () => {
+      const perOrganization = await Promise.all(
+        organizations.map(async (organization) => ({
+          organization,
+          devices: responseItems(
+            await apiRequest<Json>(
+              `/services/device/devices?organizationId=${encodeURIComponent(organization.organizationId)}`,
+            ),
+          ),
+        })),
+      );
+      const deviceUuids = perOrganization
+        .flatMap(({ devices }) => devices.map((device) => device.deviceUuid))
+        .filter(isUuid);
+      const latestByDevice = new Map<string, Json>();
+      if (deviceUuids.length) {
+        const batch = await apiRequest<Json>(
+          "/services/telemetry/devices/latest-batch",
+          undefined,
+          { method: "POST", body: JSON.stringify({ deviceUuids }) },
+        );
+        for (const item of responseItems(batch)) {
+          const deviceUuid = item.deviceUuid;
+          if (isUuid(deviceUuid))
+            latestByDevice.set(deviceUuid, record(item.latest));
+        }
+      }
+      return perOrganization.map(({ organization, devices }) => ({
+        organization,
+        devices: devices.map((device): Json => {
+          const deviceUuid = device.deviceUuid;
+          return {
+            ...device,
+            latest: isUuid(deviceUuid)
+              ? latestByDevice.get(deviceUuid)
+              : undefined,
+          };
+        }),
+      }));
+    },
+    enabled: organizations.length > 0,
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const groups = overview.data ?? [];
+  const totalDevices = groups.reduce(
+    (sum, group) => sum + group.devices.length,
+    0,
+  );
+  return (
+    <Page title="Overview">
+      <p>All devices across every organization you belong to.</p>
+      {organizationLoading || overview.isLoading ? (
+        <Loading />
+      ) : !organizations.length ? (
+        <Empty>No authorized organizations are available.</Empty>
+      ) : overview.isError ? (
+        <ErrorState error={overview.error} />
+      ) : totalDevices ? (
+        <div className="list">
+          {groups
+            .filter((group) => group.devices.length > 0)
+            .map((group) => (
+              <article key={group.organization.organizationId}>
+                <strong>
+                  {group.organization.name ?? "Authorized organization"}
+                </strong>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Device</th>
+                        <th>Temperature</th>
+                        <th>pH</th>
+                        <th>Last reading</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.devices.map((device, index) => {
+                        const latest = record(device.latest);
+                        const values = record(latest.values);
+                        return (
+                          <tr key={String(device.deviceUuid ?? index)}>
+                            <td>
+                              {text(device.displayName ?? device.deviceId)}
+                            </td>
+                            <td>
+                              {values.temperatureC == null
+                                ? "—"
+                                : `${text(values.temperatureC)} °C`}
+                            </td>
+                            <td>{text(values.ph)}</td>
+                            <td>
+                              {typeof latest.observedAt === "string"
+                                ? new Date(latest.observedAt).toLocaleString()
+                                : "No data yet"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            ))}
+        </div>
+      ) : (
+        <Empty>No devices have been claimed in any organization yet.</Empty>
+      )}
+    </Page>
+  );
+}
+
 export function OrganizationsPage() {
   const queryClient = useQueryClient();
   const {
@@ -619,6 +740,71 @@ export function DevicesPage() {
         </div>
       ) : (
         <Empty>No devices have been claimed for this organization.</Empty>
+      )}
+    </Page>
+  );
+}
+
+export function AlertsPage() {
+  const { selectedOrganizationId, loading: organizationLoading } =
+    useOrganization();
+  const alerts = usePlatformQuery(
+    "alerts",
+    selectedOrganizationId
+      ? `/services/realtime/organizations/${encodeURIComponent(selectedOrganizationId)}/alerts`
+      : "",
+    !!selectedOrganizationId,
+  );
+  const values = responseItems(alerts.data);
+  return (
+    <Page title="Alerts">
+      <p>
+        Threshold breaches for devices in the active organization, most recent
+        first.
+      </p>
+      {organizationLoading || alerts.isLoading ? (
+        <Loading />
+      ) : !selectedOrganizationId ? (
+        <Empty>Select an authorized organization first.</Empty>
+      ) : alerts.isError ? (
+        <ErrorState error={alerts.error} />
+      ) : values.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Parameter</th>
+                <th>Reading</th>
+                <th>Threshold</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {values.map((alert, index) => (
+                <tr key={String(alert.alertId ?? index)}>
+                  <td>{text(alert.deviceId)}</td>
+                  <td>{text(alert.parameter)}</td>
+                  <td>
+                    {text(alert.value)} ({text(alert.direction)})
+                  </td>
+                  <td>
+                    {alert.direction === "HIGH"
+                      ? `above ${text(alert.maximum)}`
+                      : `below ${text(alert.minimum)}`}
+                  </td>
+                  <td>
+                    {typeof alert.occurredAt === "string"
+                      ? new Date(alert.occurredAt).toLocaleString()
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <Empty>No alerts recorded yet.</Empty>
       )}
     </Page>
   );

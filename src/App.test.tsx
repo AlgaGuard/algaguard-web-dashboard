@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -20,6 +26,7 @@ function renderApp(path = "/dashboard") {
 
 describe("dashboard demo", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -420,14 +427,15 @@ describe("dashboard demo", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     const view = renderApp("/organizations");
-    await screen.findByText("Development organization");
+    const main = () => within(screen.getByRole("main"));
+    await main().findByText("Development organization");
     fireEvent.change(screen.getByLabelText("New organization name"), {
       target: { value: "Second org" },
     });
     fireEvent.click(
       screen.getByRole("button", { name: "Create organization" }),
     );
-    expect(await screen.findByText("Second org")).toBeInTheDocument();
+    expect(await main().findByText("Second org")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Email address"), {
       target: { value: "member@example.com" },
     });
@@ -562,6 +570,156 @@ describe("dashboard demo", () => {
     const view = renderApp(`/devices/${deviceUuid}`);
     expect(await screen.findByText(/Threshold alert/i)).toBeInTheDocument();
     expect(screen.getByText(/above maximum 28/i)).toBeInTheDocument();
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("switches the active organization from the header dropdown and persists the choice", async () => {
+    const orgOne = "10000000-0000-4000-8000-000000000001";
+    const orgTwo = "10000000-0000-4000-8000-000000000002";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("/services/access/organizations")
+        ? {
+            items: [
+              { id: orgOne, name: "First org" },
+              { id: orgTwo, name: "Second org" },
+            ],
+          }
+        : url.includes("/services/device/devices")
+          ? { items: [] }
+          : [];
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = renderApp("/devices");
+    const select = await screen.findByLabelText("Switch organization");
+    fireEvent.change(select, { target: { value: orgTwo } });
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining(`organizationId=${orgTwo}`),
+        expect.any(Object),
+      ),
+    );
+    expect(localStorage.getItem("algaguard.selectedOrganizationId")).toBe(
+      orgTwo,
+    );
+    view.unmount();
+    view.queryClient.clear();
+    localStorage.clear();
+  });
+
+  it("shows every device across every organization on the overview page", async () => {
+    const orgOne = "10000000-0000-4000-8000-000000000001";
+    const orgTwo = "10000000-0000-4000-8000-000000000002";
+    const deviceOne = "20000000-0000-4000-8000-000000000001";
+    const deviceTwo = "20000000-0000-4000-8000-000000000002";
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        const body = url.includes("/services/access/organizations")
+          ? {
+              items: [
+                { id: orgOne, name: "First org" },
+                { id: orgTwo, name: "Second org" },
+              ],
+            }
+          : method === "POST" && url.includes("/latest-batch")
+            ? {
+                items: [
+                  {
+                    deviceUuid: deviceOne,
+                    latest: {
+                      observedAt: "2026-08-01T00:00:00.000Z",
+                      values: { temperatureC: 24, ph: 7 },
+                    },
+                  },
+                ],
+              }
+            : url.includes(`organizationId=${orgOne}`)
+              ? {
+                  items: [
+                    {
+                      deviceUuid: deviceOne,
+                      deviceId: "AG-000001",
+                      displayName: "Tank A",
+                      lifecycle: "ACTIVE",
+                    },
+                  ],
+                }
+              : url.includes(`organizationId=${orgTwo}`)
+                ? {
+                    items: [
+                      {
+                        deviceUuid: deviceTwo,
+                        deviceId: "AG-000002",
+                        displayName: "Tank B",
+                        lifecycle: "ACTIVE",
+                      },
+                    ],
+                  }
+                : [];
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const view = renderApp("/overview");
+    const main = within(screen.getByRole("main"));
+    expect(await main.findByText("First org")).toBeInTheDocument();
+    expect(await main.findByText("Second org")).toBeInTheDocument();
+    expect(await main.findByText("Tank A")).toBeInTheDocument();
+    expect(main.getByText("Tank B")).toBeInTheDocument();
+    expect(main.getByText("24 °C")).toBeInTheDocument();
+    expect(main.getByText("No data yet")).toBeInTheDocument();
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("lists recorded threshold alerts for the active organization", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("/services/access/organizations")
+        ? {
+            items: [
+              {
+                id: "10000000-0000-4000-8000-000000000001",
+                name: "Development organization",
+              },
+            ],
+          }
+        : url.includes("/organizations/") && url.includes("/alerts")
+          ? {
+              items: [
+                {
+                  alertId: "40000000-0000-4000-8000-000000000001",
+                  deviceId: "AG-000001",
+                  parameter: "temperatureC",
+                  direction: "HIGH",
+                  value: 34.5,
+                  maximum: 28,
+                  occurredAt: "2026-08-01T00:00:00.000Z",
+                },
+              ],
+            }
+          : [];
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = renderApp("/alerts");
+    expect(await screen.findByText("AG-000001")).toBeInTheDocument();
+    expect(screen.getByText("temperatureC")).toBeInTheDocument();
+    expect(screen.getByText(/34.5 \(HIGH\)/)).toBeInTheDocument();
+    expect(screen.getByText("above 28")).toBeInTheDocument();
     view.unmount();
     view.queryClient.clear();
   });

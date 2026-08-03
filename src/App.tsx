@@ -6,6 +6,7 @@ import { hasRole, initializeAuthentication, keycloak } from "./auth";
 import { OrganizationProvider, useOrganization } from "./organization";
 import "./brand.css";
 import {
+  AlertsPage,
   AuthCallbackPage,
   CommandPage,
   DashboardPage,
@@ -15,6 +16,7 @@ import {
   LoginPage,
   OrganizationsPage,
   OtaPage,
+  OverviewPage,
   ProfilesPage,
 } from "./pages";
 import {
@@ -24,11 +26,13 @@ import {
 } from "./realtime";
 
 const navigation = [
+  ["Overview", "/overview"],
   ["Dashboard", "/dashboard"],
   ["Organizations", "/organizations"],
   ["Invitations", "/invitations"],
   ["Devices", "/devices"],
   ["Profiles", "/profiles"],
+  ["Alerts", "/alerts"],
   ["Commands", "/commands"],
   ["OTA", "/ota"],
 ] as const;
@@ -92,6 +96,25 @@ function AppShell({ children }: { children: ReactNode }) {
           <span className="badge">Simulated demo data</span>
         </div>
         <div className="header-actions">
+          {organization.organizations.length > 0 ? (
+            <select
+              aria-label="Switch organization"
+              value={organization.selectedOrganizationId ?? ""}
+              disabled={organization.organizations.length < 2}
+              onChange={(event) =>
+                organization.selectOrganization(event.target.value)
+              }
+            >
+              {!organization.selectedOrganizationId ? (
+                <option value="">Select organization</option>
+              ) : null}
+              {organization.organizations.map((item) => (
+                <option key={item.organizationId} value={item.organizationId}>
+                  {item.name ?? "Authorized organization"}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <span className={`connection ${realtime}`}>{realtime}</span>
           <button
             type="button"
@@ -125,6 +148,11 @@ export function App() {
       <Switch>
         <Route path="/login" component={LoginPage} />
         <Route path="/auth/callback" component={AuthCallbackPage} />
+        <Route path="/overview">
+          <ProtectedPage>
+            <OverviewPage />
+          </ProtectedPage>
+        </Route>
         <Route path="/dashboard">
           <ProtectedPage>
             <DashboardPage />
@@ -148,6 +176,11 @@ export function App() {
         <Route path="/devices">
           <ProtectedPage>
             <DevicesPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/alerts">
+          <ProtectedPage>
+            <AlertsPage />
           </ProtectedPage>
         </Route>
         <Route path="/profiles">
