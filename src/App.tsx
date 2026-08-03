@@ -11,6 +11,7 @@ import {
   DashboardPage,
   DeviceDetailsPage,
   DevicesPage,
+  InvitationsPage,
   LoginPage,
   OrganizationsPage,
   OtaPage,
@@ -25,6 +26,7 @@ import {
 const navigation = [
   ["Dashboard", "/dashboard"],
   ["Organizations", "/organizations"],
+  ["Invitations", "/invitations"],
   ["Devices", "/devices"],
   ["Profiles", "/profiles"],
   ["Commands", "/commands"],
@@ -85,7 +87,7 @@ function AppShell({ children }: { children: ReactNode }) {
     <div className="shell">
       <header>
         <div className="brand-lockup">
-          <img src="/algaguard-logo.png" alt="AlgaGuard" />
+          <img src="/algaguard-logo-transparent.png" alt="AlgaGuard" />
           <strong>AlgaGuard</strong>
           <span className="badge">Simulated demo data</span>
         </div>
@@ -131,6 +133,11 @@ export function App() {
         <Route path="/organizations">
           <ProtectedPage>
             <OrganizationsPage />
+          </ProtectedPage>
+        </Route>
+        <Route path="/invitations">
+          <ProtectedPage>
+            <InvitationsPage />
           </ProtectedPage>
         </Route>
         <Route path="/devices/:deviceUuid">

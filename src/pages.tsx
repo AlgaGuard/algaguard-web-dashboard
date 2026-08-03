@@ -41,6 +41,24 @@ function profileConfiguration(inputs: ThresholdInputs): Json {
   return { status: "DRAFT", thresholds };
 }
 
+function exceededThresholds(values: Json, thresholds: Json) {
+  const alerts: { label: string; value: number; min?: number; max?: number }[] =
+    [];
+  for (const [key, label] of thresholdFields) {
+    const value = values[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const bounds = record(thresholds[key]);
+    const min = typeof bounds.min === "number" ? bounds.min : undefined;
+    const max = typeof bounds.max === "number" ? bounds.max : undefined;
+    if (
+      (min !== undefined && value < min) ||
+      (max !== undefined && value > max)
+    )
+      alerts.push({ label, value, min, max });
+  }
+  return alerts;
+}
+
 function isUuid(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -127,6 +145,11 @@ function usePlatformQuery<T = unknown>(
 export function LoginPage() {
   return (
     <section className="login">
+      <img
+        className="brand-wordmark"
+        src="/algaguard-logo-tagline-transparent.png"
+        alt="AlgaGuard"
+      />
       <h1>Sign in to AlgaGuard</h1>
       <p>
         Use the configured local Keycloak realm. Tokens are managed by Keycloak
@@ -156,6 +179,11 @@ export function AuthCallbackPage() {
   }, [navigate]);
   return (
     <section className="login">
+      <img
+        className="brand-wordmark"
+        src="/algaguard-logo-tagline-transparent.png"
+        alt="AlgaGuard"
+      />
       <h1>Completing sign-in</h1>
       {failed ? (
         <p role="alert">
@@ -306,6 +334,7 @@ function Summary({
 }
 
 export function OrganizationsPage() {
+  const queryClient = useQueryClient();
   const {
     organizations: values,
     selectedOrganizationId: active,
@@ -313,12 +342,68 @@ export function OrganizationsPage() {
     loading,
     error,
   } = useOrganization();
+  const [organizationName, setOrganizationName] = useState("");
+  const createOrganization = useMutation({
+    mutationFn: async () => {
+      const normalized = organizationName.trim().slice(0, 120);
+      if (!normalized) throw new Error("Organization name is required");
+      await apiRequest("/services/access/organizations", undefined, {
+        method: "POST",
+        body: JSON.stringify({ name: normalized }),
+      });
+    },
+    onSuccess: () => {
+      setOrganizationName("");
+      void queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    },
+  });
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("VIEWER");
+  const invite = useMutation({
+    mutationFn: async () => {
+      const normalized = inviteEmail.trim();
+      if (!active || !normalized)
+        throw new Error("Select an organization and enter an email address");
+      await apiRequest(
+        `/services/access/organizations/${encodeURIComponent(active)}/invitations`,
+        undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({ email: normalized, role: inviteRole }),
+        },
+      );
+    },
+    onSuccess: () => setInviteEmail(""),
+  });
   return (
     <Page title="Organizations">
       <p>
         Select an organization authorized by the current membership. Revoked
         memberships are shown as unavailable and cannot become active.
       </p>
+      <form
+        className="panel form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          createOrganization.mutate();
+        }}
+      >
+        <label>
+          New organization name
+          <input
+            maxLength={120}
+            required
+            value={organizationName}
+            onChange={(event) => setOrganizationName(event.target.value)}
+          />
+        </label>
+        <button disabled={createOrganization.isPending} type="submit">
+          {createOrganization.isPending ? "Creating…" : "Create organization"}
+        </button>
+        {createOrganization.isError ? (
+          <ErrorState error={createOrganization.error} />
+        ) : null}
+      </form>
       {loading ? (
         <Loading />
       ) : error ? (
@@ -355,6 +440,121 @@ export function OrganizationsPage() {
       ) : (
         <Empty>No authorized organizations are available.</Empty>
       )}
+      <h2>Invite a member</h2>
+      <form
+        className="panel form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          invite.mutate();
+        }}
+      >
+        <p className="notice">
+          Invites the active organization&apos;s membership. Only owners and
+          admins can send invitations; other members will see an error.
+        </p>
+        <label>
+          Email address
+          <input
+            required
+            type="email"
+            value={inviteEmail}
+            onChange={(event) => setInviteEmail(event.target.value)}
+          />
+        </label>
+        <label>
+          Role
+          <select
+            value={inviteRole}
+            onChange={(event) => setInviteRole(event.target.value)}
+          >
+            <option value="ADMIN">ADMIN</option>
+            <option value="VIEWER">VIEWER</option>
+          </select>
+        </label>
+        <button disabled={invite.isPending || !active} type="submit">
+          {invite.isPending ? "Sending…" : "Send invitation"}
+        </button>
+        {invite.isError ? <ErrorState error={invite.error} /> : null}
+        {invite.isSuccess ? <p role="status">Invitation sent.</p> : null}
+      </form>
+    </Page>
+  );
+}
+
+export function InvitationsPage() {
+  const queryClient = useQueryClient();
+  const invitations = usePlatformQuery(
+    "invitations",
+    "/services/access/invitations",
+  );
+  const values = responseItems(invitations.data);
+  const respond = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "accept" | "reject" }) =>
+      apiRequest(
+        `/services/access/invitations/${encodeURIComponent(id)}/${action}`,
+        undefined,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      void queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    },
+  });
+  return (
+    <Page title="Invitations">
+      <p>
+        Pending invitations to organizations for your account. Accepting adds
+        the organization to your available list; rejecting discards it.
+      </p>
+      {invitations.isLoading ? (
+        <Loading />
+      ) : invitations.isError ? (
+        <ErrorState error={invitations.error} />
+      ) : values.length ? (
+        <div className="list">
+          {values.map((invitation, index) => {
+            const id = String(invitation.id ?? index);
+            return (
+              <article key={id}>
+                <strong>
+                  {text(
+                    invitation.organizationName ?? invitation.organizationId,
+                  )}
+                </strong>
+                <span>Role {text(invitation.role)}</span>
+                <span>
+                  {typeof invitation.expiresAt === "string"
+                    ? `Expires ${new Date(invitation.expiresAt).toLocaleString()}`
+                    : null}
+                </span>
+                <div className="item-actions">
+                  <button
+                    disabled={respond.isPending}
+                    type="button"
+                    onClick={() => respond.mutate({ id, action: "accept" })}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="button-danger"
+                    disabled={respond.isPending}
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Reject this invitation?"))
+                        respond.mutate({ id, action: "reject" });
+                    }}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <Empty>No pending invitations.</Empty>
+      )}
+      {respond.isError ? <ErrorState error={respond.error} /> : null}
     </Page>
   );
 }
@@ -430,8 +630,8 @@ export function DeviceDetailsPage() {
   const queryClient = useQueryClient();
   const { selectedOrganizationId } = useOrganization();
   const [deviceName, setDeviceName] = useState("");
-  const [profileName, setProfileName] = useState("");
-  const [thresholdInputs, setThresholdInputs] = useState<ThresholdInputs>({});
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [unpairState, setUnpairState] = useState("IDLE");
   const device = usePlatformQuery(
     `device:${deviceUuid}`,
     `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
@@ -440,28 +640,52 @@ export function DeviceDetailsPage() {
     `telemetry:${deviceUuid}`,
     `/services/telemetry/devices/${encodeURIComponent(deviceUuid)}/telemetry`,
   );
+  const latest = usePlatformQuery(
+    `telemetry-latest:${deviceUuid}`,
+    `/services/telemetry/devices/${encodeURIComponent(deviceUuid)}/latest`,
+  );
   const status = record(device.data);
   const history = responseItems(telemetry.data);
+  const profiles = usePlatformQuery(
+    "profiles",
+    selectedOrganizationId
+      ? `/services/profile/profiles?organizationId=${encodeURIComponent(selectedOrganizationId)}`
+      : "",
+    !!selectedOrganizationId,
+  );
+  const profileOptions = responseItems(profiles.data);
+  const activeDeviceId = String(status.deviceId ?? "");
+  const profileAssignment = usePlatformQuery(
+    `profile-assignment:${activeDeviceId}`,
+    `/services/profile/devices/${encodeURIComponent(activeDeviceId)}/profile-assignment`,
+    /^AG-[0-9]{6}$/.test(activeDeviceId),
+  );
+  const assignedProfileId = String(
+    record(profileAssignment.data).profileId ?? "",
+  );
+  const assignedProfile = usePlatformQuery(
+    `profile:${assignedProfileId}`,
+    `/services/profile/profiles/${encodeURIComponent(assignedProfileId)}`,
+    isUuid(assignedProfileId),
+  );
+  const thresholds = record(
+    record(record(assignedProfile.data).current).configuration,
+  ).thresholds;
+  const latestValues = record(record(latest.data).latest).values;
+  const alerts = exceededThresholds(record(latestValues), record(thresholds));
   useEffect(() => {
     if (!deviceName && typeof status.displayName === "string") {
       setDeviceName(status.displayName);
     }
-    if (!profileName && typeof status.deviceId === "string") {
-      setProfileName(
-        `${String(status.displayName ?? status.deviceId)} profile`,
-      );
+    if (!selectedProfileId && assignedProfileId) {
+      setSelectedProfileId(assignedProfileId);
     }
-  }, [deviceName, profileName, status.displayName, status.deviceId]);
+  }, [deviceName, selectedProfileId, status.displayName, assignedProfileId]);
   const setup = useMutation({
     mutationFn: async () => {
       const normalizedDeviceName = deviceName.trim();
-      const normalizedProfileName = profileName.trim();
-      if (
-        !selectedOrganizationId ||
-        !normalizedDeviceName ||
-        !normalizedProfileName
-      ) {
-        throw new Error("Device and profile names are required");
+      if (!selectedOrganizationId || !normalizedDeviceName) {
+        throw new Error("Device name is required");
       }
       await apiRequest(
         `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
@@ -471,35 +695,11 @@ export function DeviceDetailsPage() {
           body: JSON.stringify({ displayName: normalizedDeviceName }),
         },
       );
-      const profileResponse = await apiRequest<Json>(
-        `/services/profile/profiles?organizationId=${encodeURIComponent(selectedOrganizationId)}`,
+      const profile = profileOptions.find(
+        (candidate) => String(candidate.profileId) === selectedProfileId,
       );
-      const existing = responseItems(profileResponse).find(
-        (profile) =>
-          String(profile.name ?? "").toLocaleLowerCase() ===
-          normalizedProfileName.toLocaleLowerCase(),
-      );
-      const configuration = profileConfiguration(thresholdInputs);
-      const profile =
-        existing ??
-        (await apiRequest<Json>("/services/profile/profiles", undefined, {
-          method: "POST",
-          body: JSON.stringify({
-            organizationId: selectedOrganizationId,
-            name: normalizedProfileName,
-            configuration,
-          }),
-        }));
-      const profileId = profile.profileId;
-      const current = record(profile.current);
-      const profileVersion = existing
-        ? await apiRequest<Json>(
-            `/services/profile/profiles/${encodeURIComponent(String(profileId))}/versions`,
-            undefined,
-            { method: "POST", body: JSON.stringify(configuration) },
-          )
-        : current;
-      const version = Number(profileVersion.version);
+      const profileId = profile?.profileId;
+      const version = Number(record(profile?.current).version);
       const deviceId = String(status.deviceId ?? "");
       if (
         !isUuid(profileId) ||
@@ -507,7 +707,7 @@ export function DeviceDetailsPage() {
         version < 1 ||
         !/^AG-[0-9]{6}$/.test(deviceId)
       )
-        throw new Error("Profile activation data is invalid");
+        throw new Error("Select a profile to assign to this device");
       const assignment = await apiRequest<Json>(
         `/services/profile/devices/${encodeURIComponent(deviceId)}/profile-assignment`,
         undefined,
@@ -546,16 +746,68 @@ export function DeviceDetailsPage() {
       }),
   });
   const remove = useMutation({
-    mutationFn: () =>
-      apiRequest(
-        `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
+    mutationFn: async () => {
+      const deviceId = String(status.deviceId ?? "");
+      const ownershipVersion = String(status.ownershipVersion ?? "");
+      if (
+        !/^AG-[0-9]{6}$/.test(deviceId) ||
+        !/^[1-9][0-9]{0,18}$/.test(ownershipVersion)
+      )
+        throw new Error("Device binding is unavailable");
+      const commandId = crypto.randomUUID();
+      const expiresAt = Date.now() + 2 * 60 * 1000;
+      setUnpairState("WAITING_FOR_DEVICE");
+      await apiRequest(
+        `/services/command/devices/${encodeURIComponent(deviceId)}/commands`,
         undefined,
         {
-          method: "DELETE",
-          body: JSON.stringify({ confirmation: "REMOVE" }),
+          method: "POST",
+          body: JSON.stringify({
+            commandId,
+            commandType: "REQUEST_PHYSICAL_UNPAIR",
+            expiresAt: new Date(expiresAt).toISOString(),
+            parameters: {},
+          }),
         },
-      ),
+      );
+      while (Date.now() < expiresAt) {
+        const command = await apiRequest<Json>(
+          `/services/command/commands/${encodeURIComponent(commandId)}`,
+        );
+        if (
+          command.commandId !== commandId ||
+          command.deviceId !== deviceId ||
+          command.commandType !== "REQUEST_PHYSICAL_UNPAIR"
+        )
+          throw new Error("Physical confirmation response is invalid");
+        if (command.status === "SUCCEEDED") {
+          setUnpairState("FINALIZING");
+          const result = await apiRequest<Json>(
+            `/services/device/devices/${encodeURIComponent(deviceUuid)}/physical-unpair/finalize`,
+            undefined,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                commandId,
+                ownershipVersion,
+                confirmation: "PHYSICALLY_CONFIRMED",
+              }),
+            },
+          );
+          if (result.state !== "UNPAIRED" || result.lifecycle !== "UNCLAIMED")
+            throw new Error("Physical unpair was not finalized");
+          return;
+        }
+        if (["REJECTED", "FAILED", "EXPIRED"].includes(String(command.status)))
+          throw new Error("The device cancelled or rejected physical unpair");
+        await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      }
+      throw new Error(
+        "Physical confirmation expired; the device remains paired",
+      );
+    },
     onSuccess: () => navigate("/devices"),
+    onError: () => setUnpairState("NOT_REMOVED"),
   });
   return (
     <Page
@@ -572,6 +824,21 @@ export function DeviceDetailsPage() {
         <ErrorState error={device.error} />
       ) : (
         <>
+          {alerts.length ? (
+            <div className="alert-banner" role="alert">
+              <strong>Threshold alert</strong>
+              <ul>
+                {alerts.map((alert) => (
+                  <li key={alert.label}>
+                    {alert.label} is {text(alert.value)}
+                    {alert.max !== undefined && alert.value > alert.max
+                      ? ` (above maximum ${text(alert.max)})`
+                      : ` (below minimum ${text(alert.min)})`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="cards">
             <ValueCard
               label="Network/cloud"
@@ -579,7 +846,11 @@ export function DeviceDetailsPage() {
             />
             <ValueCard
               label="Active profile"
-              value={status.profileName ?? status.profileId}
+              value={
+                assignedProfileId
+                  ? (record(assignedProfile.data).name ?? assignedProfileId)
+                  : undefined
+              }
             />
             <ValueCard label="Firmware" value={status.firmwareVersion} />
             <ValueCard
@@ -630,78 +901,76 @@ export function DeviceDetailsPage() {
               />
             </label>
             <label>
-              Profile name
-              <input
-                maxLength={120}
+              Assign profile
+              <select
+                aria-label="Assign profile"
                 required
-                value={profileName}
-                onChange={(event) => setProfileName(event.target.value)}
-              />
+                value={selectedProfileId}
+                onChange={(event) => setSelectedProfileId(event.target.value)}
+              >
+                <option value="">Select a profile</option>
+                {profileOptions.map((profile) => (
+                  <option
+                    key={String(profile.profileId)}
+                    value={String(profile.profileId)}
+                  >
+                    {text(profile.name)} (v
+                    {text(record(profile.current).version)})
+                  </option>
+                ))}
+              </select>
             </label>
-            <fieldset>
-              <legend>User-defined profile thresholds</legend>
+            {!profileOptions.length ? (
               <p className="notice">
-                Optional values are stored in this profile only; they are not
-                scientifically approved alert recommendations.
+                No profiles exist yet.{" "}
+                <Link to="/profiles">Create one on the Profiles page</Link>.
               </p>
-              {thresholdFields.map(([key, label]) => (
-                <div className="two-column" key={key}>
-                  <label>
-                    {label} minimum
-                    <input
-                      inputMode="decimal"
-                      type="number"
-                      value={thresholdInputs[`${key}Min`] ?? ""}
-                      onChange={(event) =>
-                        setThresholdInputs((current) => ({
-                          ...current,
-                          [`${key}Min`]: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    {label} maximum
-                    <input
-                      inputMode="decimal"
-                      type="number"
-                      value={thresholdInputs[`${key}Max`] ?? ""}
-                      onChange={(event) =>
-                        setThresholdInputs((current) => ({
-                          ...current,
-                          [`${key}Max`]: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
-            </fieldset>
+            ) : null}
             <p className="notice">
-              Saving creates or versions the profile, assigns it, and queues one
-              activation command for this device.
+              Saving assigns the selected profile and queues one activation
+              command for this device.
             </p>
-            <button disabled={setup.isPending} type="submit">
-              {setup.isPending ? "Savingâ€¦" : "Save device setup"}
+            <button
+              disabled={setup.isPending || !selectedProfileId}
+              type="submit"
+            >
+              {setup.isPending ? "Saving…" : "Save device setup"}
             </button>
             {setup.isError ? <ErrorState error={setup.error} /> : null}
           </form>
           <section className="panel">
-            <h2>Remove device</h2>
-            <p>Removal revokes cloud access while preserving audit history.</p>
+            <h2>Physically unpair device</h2>
+            <p>
+              The online ESP32 will show REMOVE DEVICE?. Press Select on its
+              OLED to confirm, or Back to cancel. Ownership and credentials are
+              changed only after the device confirms.
+            </p>
             <button
               disabled={remove.isPending}
               type="button"
               onClick={() => {
                 if (
-                  window.confirm("Remove this device from the organization?")
+                  window.confirm(
+                    "Request physical unpair? You must confirm on the ESP32 OLED.",
+                  )
                 ) {
                   remove.mutate();
                 }
               }}
             >
-              Remove device
+              {remove.isPending
+                ? "Waiting for device confirmationÃ¢â‚¬Â¦"
+                : "Request physical unpair"}
             </button>
+            {unpairState !== "IDLE" ? (
+              <p className="notice" role="status">
+                {unpairState === "WAITING_FOR_DEVICE"
+                  ? "Waiting for OLED confirmation. The device remains paired until confirmed."
+                  : unpairState === "FINALIZING"
+                    ? "Physical confirmation received; securely finalizing unpair."
+                    : "Unpair did not complete; the device remains paired."}
+              </p>
+            ) : null}
             {remove.isError ? <ErrorState error={remove.error} /> : null}
           </section>
         </>
@@ -711,6 +980,7 @@ export function DeviceDetailsPage() {
 }
 
 export function ProfilesPage() {
+  const queryClient = useQueryClient();
   const { selectedOrganizationId, loading: organizationLoading } =
     useOrganization();
   const profiles = usePlatformQuery(
@@ -721,22 +991,50 @@ export function ProfilesPage() {
     !!selectedOrganizationId,
   );
   const values = responseItems(profiles.data);
+  const [profileName, setProfileName] = useState("");
+  const [thresholdInputs, setThresholdInputs] = useState<ThresholdInputs>({});
+  const create = useMutation({
+    mutationFn: async () => {
+      const normalizedName = profileName.trim();
+      if (!selectedOrganizationId || !normalizedName)
+        throw new Error("Organization and profile name are required");
+      await apiRequest("/services/profile/profiles", undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          organizationId: selectedOrganizationId,
+          name: normalizedName,
+          configuration: profileConfiguration(thresholdInputs),
+        }),
+      });
+    },
+    onSuccess: () => {
+      setProfileName("");
+      setThresholdInputs({});
+      void queryClient.invalidateQueries({ queryKey: ["profiles"] });
+    },
+  });
+  const deleteProfile = useMutation({
+    mutationFn: (profileId: string) =>
+      apiRequest(
+        `/services/profile/profiles/${encodeURIComponent(profileId)}`,
+        undefined,
+        {
+          method: "DELETE",
+          body: JSON.stringify({ confirmation: "DELETE" }),
+        },
+      ),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["profiles"] }),
+  });
   return (
-    <Page
-      title="Profiles"
-      actions={
-        <Link className="button-link" to="/devices">
-          Create and assign from a device
-        </Link>
-      }
-    >
+    <Page title="Profiles">
       <p className="notice">
         Profile values in this demo are user-defined and are not scientifically
         approved.
       </p>
       <p>
-        Open a device to create or version its profile, set optional thresholds,
-        and send one activation command.
+        Create algae profiles here, then assign one to a device from that
+        device&apos;s page.
       </p>
       {organizationLoading || profiles.isLoading ? (
         <Loading />
@@ -746,17 +1044,103 @@ export function ProfilesPage() {
         <ErrorState error={profiles.error} />
       ) : values.length ? (
         <div className="list">
-          {values.map((profile, index) => (
-            <article key={String(profile.profileId ?? profile.id ?? index)}>
-              <strong>{text(profile.name ?? profile.profileId)}</strong>
-              <span>Version {text(profile.version)}</span>
-              <p>{text(profile.description)}</p>
-            </article>
-          ))}
+          {values.map((profile, index) => {
+            const profileId = String(profile.profileId ?? profile.id ?? "");
+            return (
+              <article key={profileId || index}>
+                <strong>{text(profile.name ?? profileId)}</strong>
+                <span>Version {text(record(profile.current).version)}</span>
+                <div className="item-actions">
+                  <button
+                    className="button-danger"
+                    disabled={deleteProfile.isPending}
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Delete profile "${text(profile.name ?? profileId)}"? This cannot be undone.`,
+                        )
+                      )
+                        deleteProfile.mutate(profileId);
+                    }}
+                  >
+                    Delete profile
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       ) : (
-        <Empty>No profile versions are available.</Empty>
+        <Empty>No profiles have been created for this organization.</Empty>
       )}
+      {deleteProfile.isError ? (
+        <ErrorState error={deleteProfile.error} />
+      ) : null}
+      <h2>Create profile</h2>
+      <form
+        className="panel form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          create.mutate();
+        }}
+      >
+        <label>
+          Profile name
+          <input
+            maxLength={120}
+            required
+            value={profileName}
+            onChange={(event) => setProfileName(event.target.value)}
+          />
+        </label>
+        <fieldset>
+          <legend>User-defined profile thresholds</legend>
+          <p className="notice">
+            Optional values are stored in this profile only; they are not
+            scientifically approved alert recommendations.
+          </p>
+          {thresholdFields.map(([key, label]) => (
+            <div className="two-column" key={key}>
+              <label>
+                {label} minimum
+                <input
+                  inputMode="decimal"
+                  type="number"
+                  value={thresholdInputs[`${key}Min`] ?? ""}
+                  onChange={(event) =>
+                    setThresholdInputs((current) => ({
+                      ...current,
+                      [`${key}Min`]: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                {label} maximum
+                <input
+                  inputMode="decimal"
+                  type="number"
+                  value={thresholdInputs[`${key}Max`] ?? ""}
+                  onChange={(event) =>
+                    setThresholdInputs((current) => ({
+                      ...current,
+                      [`${key}Max`]: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          ))}
+        </fieldset>
+        <button
+          disabled={create.isPending || !selectedOrganizationId}
+          type="submit"
+        >
+          {create.isPending ? "Creating…" : "Create profile"}
+        </button>
+        {create.isError ? <ErrorState error={create.error} /> : null}
+      </form>
     </Page>
   );
 }

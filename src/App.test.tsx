@@ -167,20 +167,18 @@ describe("dashboard demo", () => {
     );
     const view = renderApp("/devices/20000000-0000-4000-8000-000000000001");
     expect(await screen.findByDisplayValue("North tank")).toBeInTheDocument();
-    expect(screen.getByLabelText("Profile name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Temperature minimum")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assign profile")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Save device setup" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Remove device" }),
+      screen.getByRole("button", { name: "Request physical unpair" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/preserving audit history/i)).toBeInTheDocument();
     view.unmount();
     view.queryClient.clear();
   });
 
-  it("stores thresholds, assigns the profile, and queues one activation command", async () => {
+  it("assigns an existing profile and queues one activation command", async () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -197,20 +195,23 @@ describe("dashboard demo", () => {
           : url.includes("/services/telemetry/devices/")
             ? { items: [] }
             : url.includes("/services/profile/profiles?")
-              ? { items: [] }
-              : method === "POST" && url.endsWith("/services/profile/profiles")
-                ? {
-                    profileId: "30000000-0000-4000-8000-000000000001",
-                    current: { version: 1 },
-                  }
-                : method === "PUT" && url.includes("profile-assignment")
-                  ? { id: "40000000-0000-4000-8000-000000000001" }
-                  : {
-                      deviceUuid: "20000000-0000-4000-8000-000000000001",
-                      deviceId: "AG-999999",
-                      displayName: "North tank",
-                      lifecycle: "ACTIVE",
-                    };
+              ? {
+                  items: [
+                    {
+                      profileId: "30000000-0000-4000-8000-000000000001",
+                      name: "Reef mix",
+                      current: { version: 1 },
+                    },
+                  ],
+                }
+              : method === "PUT" && url.includes("profile-assignment")
+                ? { id: "40000000-0000-4000-8000-000000000001" }
+                : {
+                    deviceUuid: "20000000-0000-4000-8000-000000000001",
+                    deviceId: "AG-999999",
+                    displayName: "North tank",
+                    lifecycle: "ACTIVE",
+                  };
         return new Response(JSON.stringify(body), {
           status: method === "POST" && url.includes("/commands") ? 202 : 200,
           headers: { "content-type": "application/json" },
@@ -220,11 +221,9 @@ describe("dashboard demo", () => {
     vi.stubGlobal("fetch", fetchMock);
     const view = renderApp("/devices/20000000-0000-4000-8000-000000000001");
     await screen.findByDisplayValue("North tank");
-    fireEvent.change(screen.getByLabelText("Temperature minimum"), {
-      target: { value: "18" },
-    });
-    fireEvent.change(screen.getByLabelText("Temperature maximum"), {
-      target: { value: "28" },
+    await screen.findByRole("option", { name: /Reef mix/ });
+    fireEvent.change(screen.getByLabelText("Assign profile"), {
+      target: { value: "30000000-0000-4000-8000-000000000001" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save device setup" }));
     await vi.waitFor(() =>
@@ -233,17 +232,16 @@ describe("dashboard demo", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
-    const profileCall = fetchMock.mock.calls.find(
+    const assignmentCall = fetchMock.mock.calls.find(
       ([url, init]) =>
-        String(url).endsWith("/services/profile/profiles") &&
-        (init as RequestInit | undefined)?.method === "POST",
+        String(url).includes("profile-assignment") &&
+        (init as RequestInit | undefined)?.method === "PUT",
     );
     expect(
-      JSON.parse(String((profileCall?.[1] as RequestInit).body)),
+      JSON.parse(String((assignmentCall?.[1] as RequestInit).body)),
     ).toMatchObject({
-      configuration: {
-        thresholds: { temperatureC: { min: 18, max: 28 } },
-      },
+      profileId: "30000000-0000-4000-8000-000000000001",
+      version: 1,
     });
     const commandCall = fetchMock.mock.calls.find(([url]) =>
       String(url).includes("/services/command/devices/AG-999999/commands"),
@@ -299,6 +297,271 @@ describe("dashboard demo", () => {
     });
     fireEvent.click(screen.getByRole("checkbox"));
     expect(submit).toBeEnabled();
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("creates and deletes an algae profile from the Profiles page", async () => {
+    let profiles: Record<string, unknown>[] = [];
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (url.includes("/services/access/organizations")) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: "10000000-0000-4000-8000-000000000001",
+                  name: "Development organization",
+                },
+              ],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (method === "POST" && url.endsWith("/services/profile/profiles")) {
+          const created = {
+            profileId: "30000000-0000-4000-8000-000000000001",
+            name: "Reef mix",
+            current: { version: 1 },
+          };
+          profiles = [...profiles, created];
+          return new Response(JSON.stringify(created), {
+            status: 201,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (
+          method === "DELETE" &&
+          url.includes("/services/profile/profiles/")
+        ) {
+          profiles = profiles.filter(
+            (profile) => !url.endsWith(String(profile.profileId)),
+          );
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes("/services/profile/profiles?")) {
+          return new Response(JSON.stringify({ items: profiles }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+    const view = renderApp("/profiles");
+    await screen.findByText(
+      "No profiles have been created for this organization.",
+    );
+    fireEvent.change(screen.getByLabelText("Profile name"), {
+      target: { value: "Reef mix" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create profile" }));
+    expect(await screen.findByText("Reef mix")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Delete profile" }));
+    await vi.waitFor(() =>
+      expect(screen.queryByText("Reef mix")).not.toBeInTheDocument(),
+    );
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("creates an organization and sends an invitation", async () => {
+    let organizations = [
+      {
+        id: "10000000-0000-4000-8000-000000000001",
+        name: "Development organization",
+      },
+    ];
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (
+          method === "POST" &&
+          url.endsWith("/services/access/organizations")
+        ) {
+          const created = {
+            id: "10000000-0000-4000-8000-000000000002",
+            name: "Second org",
+          };
+          organizations = [...organizations, created];
+          return new Response(JSON.stringify(created), {
+            status: 201,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (method === "POST" && url.includes("/invitations")) {
+          return new Response(
+            JSON.stringify({ id: "50000000-0000-4000-8000-000000000001" }),
+            { status: 201, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (url.includes("/services/access/organizations")) {
+          return new Response(JSON.stringify({ items: organizations }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const view = renderApp("/organizations");
+    await screen.findByText("Development organization");
+    fireEvent.change(screen.getByLabelText("New organization name"), {
+      target: { value: "Second org" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create organization" }),
+    );
+    expect(await screen.findByText("Second org")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email address"), {
+      target: { value: "member@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/invitations"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    const inviteCall = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes("/invitations") &&
+        (init as RequestInit | undefined)?.method === "POST",
+    );
+    expect(
+      JSON.parse(String((inviteCall?.[1] as RequestInit).body)),
+    ).toMatchObject({ email: "member@example.com", role: "VIEWER" });
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("lists, accepts, and rejects invitations", async () => {
+    let invitations = [
+      {
+        id: "60000000-0000-4000-8000-000000000001",
+        organizationName: "Reef club",
+        role: "VIEWER",
+        expiresAt: "2026-09-01T00:00:00.000Z",
+      },
+      {
+        id: "60000000-0000-4000-8000-000000000002",
+        organizationName: "Tide pool",
+        role: "ADMIN",
+        expiresAt: "2026-09-01T00:00:00.000Z",
+      },
+    ];
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (url.endsWith("/services/access/invitations")) {
+          return new Response(JSON.stringify({ items: invitations }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (method === "POST" && url.includes("/accept")) {
+          invitations = invitations.filter(
+            (invite) => !url.includes(invite.id),
+          );
+          return new Response(JSON.stringify({}), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (method === "POST" && url.includes("/reject")) {
+          invitations = invitations.filter(
+            (invite) => !url.includes(invite.id),
+          );
+          return new Response(null, { status: 204 });
+        }
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+    const view = renderApp("/invitations");
+    expect(await screen.findByText("Reef club")).toBeInTheDocument();
+    expect(screen.getByText("Tide pool")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Accept" })[0]!);
+    await vi.waitFor(() =>
+      expect(screen.queryByText("Reef club")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    await vi.waitFor(() =>
+      expect(screen.queryByText("Tide pool")).not.toBeInTheDocument(),
+    );
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("shows a threshold alert banner when telemetry exceeds the assigned profile's thresholds", async () => {
+    const deviceUuid = "20000000-0000-4000-8000-000000000001";
+    const profileId = "30000000-0000-4000-8000-000000000001";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("/services/access/organizations")
+        ? {
+            items: [
+              {
+                id: "10000000-0000-4000-8000-000000000001",
+                name: "Development organization",
+              },
+            ],
+          }
+        : url.includes(`/services/profile/profiles/${profileId}`)
+          ? {
+              name: "Reef mix",
+              current: {
+                configuration: {
+                  thresholds: { temperatureC: { min: 18, max: 28 } },
+                },
+              },
+            }
+          : url.includes("/profile-assignment")
+            ? { profileId }
+            : url.includes("/services/profile/profiles?")
+              ? { items: [] }
+              : url.includes("/latest")
+                ? { latest: { values: { temperatureC: 32 } } }
+                : url.includes("/services/telemetry/devices/")
+                  ? { items: [] }
+                  : {
+                      deviceUuid,
+                      deviceId: "AG-999999",
+                      displayName: "North tank",
+                      lifecycle: "ACTIVE",
+                    };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = renderApp(`/devices/${deviceUuid}`);
+    expect(await screen.findByText(/Threshold alert/i)).toBeInTheDocument();
+    expect(screen.getByText(/above maximum 28/i)).toBeInTheDocument();
     view.unmount();
     view.queryClient.clear();
   });

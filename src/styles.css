@@ -28,6 +28,26 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
+.button-danger {
+  background: #9c2b2b;
+}
+.item-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.alert-banner {
+  background: #fdeaea;
+  color: #7a1f1f;
+  border: 1px solid #e3a3a3;
+  border-radius: 0.65rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.5rem;
+}
+.alert-banner ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
 .shell {
   min-height: 100vh;
   display: grid;
