@@ -101,6 +101,34 @@ describe("dashboard demo", () => {
     view.queryClient.clear();
   });
 
+  it("shows the public home page at / when signed out", () => {
+    Object.defineProperty(keycloak, "authenticated", {
+      configurable: true,
+      value: false,
+    });
+    const view = renderApp("/");
+    expect(
+      screen.getByRole("heading", {
+        name: /know your algae culture's water/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /sign in/i }).length,
+    ).toBeGreaterThan(0);
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it("redirects / to the dashboard when signed in", async () => {
+    const view = renderApp("/");
+    expect(
+      await screen.findByRole("navigation", { name: "Primary" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/know your algae culture/i)).toBeNull();
+    view.unmount();
+    view.queryClient.clear();
+  });
+
   it("shows accessible navigation and simulated-data disclosure when signed in", async () => {
     const view = renderApp();
     expect(

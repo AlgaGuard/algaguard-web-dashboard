@@ -12,6 +12,7 @@ import {
   DashboardPage,
   DeviceDetailsPage,
   DevicesPage,
+  HomePage,
   InvitationsPage,
   LoginPage,
   OrganizationsPage,
@@ -199,7 +200,11 @@ export function App() {
           </ProtectedPage>
         </Route>
         <Route path="/">
-          <Redirect to="/dashboard" replace />
+          {keycloak.authenticated ? (
+            <Redirect to="/dashboard" replace />
+          ) : (
+            <HomePage />
+          )}
         </Route>
         <Route>
           <Redirect to="/dashboard" replace />

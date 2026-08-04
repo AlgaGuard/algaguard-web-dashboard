@@ -142,6 +142,80 @@ function usePlatformQuery<T = unknown>(
   });
 }
 
+const homeFeatures = [
+  {
+    title: "Live device monitoring",
+    description:
+      "Watch temperature, pH, light, and nutrient readings update in real time, device by device.",
+  },
+  {
+    title: "Threshold alerts",
+    description:
+      "Set custom algae profiles per tank and get notified the moment a reading drifts out of range.",
+  },
+  {
+    title: "Multi-organization",
+    description:
+      "Switch between every organization you belong to and see every device in one overview.",
+  },
+];
+
+export function HomePage() {
+  return (
+    <div className="home">
+      <header className="home-header">
+        <div className="brand-lockup">
+          <img
+            src="/algaguard-logo-transparent.png"
+            alt=""
+            width={40}
+            height={40}
+          />
+          <strong>AlgaGuard</strong>
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            void keycloak.login({
+              redirectUri: `${window.location.origin}/auth/callback`,
+            })
+          }
+        >
+          Sign in
+        </button>
+      </header>
+      <div className="home-hero">
+        <div className="home-hero-inner">
+          <h1>Know your algae culture's water, minute by minute.</h1>
+          <p>
+            AlgaGuard turns your ESP32-S3 monitoring devices into a live,
+            organization-wide view of every tank&apos;s water chemistry, with
+            alerts before a reading becomes a problem.
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              void keycloak.login({
+                redirectUri: `${window.location.origin}/auth/callback`,
+              })
+            }
+          >
+            Sign in with Keycloak
+          </button>
+        </div>
+      </div>
+      <div className="home-features">
+        {homeFeatures.map((feature) => (
+          <article key={feature.title}>
+            <h2>{feature.title}</h2>
+            <p>{feature.description}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LoginPage() {
   return (
     <section className="login">

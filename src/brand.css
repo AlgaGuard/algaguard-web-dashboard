@@ -8,9 +8,14 @@
   display: block;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 0.5rem;
   object-fit: contain;
-  background: #ffffff;
+}
+
+.brand-wordmark {
+  display: block;
+  width: min(15rem, 100%);
+  height: auto;
+  margin-bottom: 1.25rem;
 }
 
 .brand-lockup strong {

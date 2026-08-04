@@ -1,8 +1,91 @@
 :root {
+  color-scheme: light;
+  --navy-50: #eff4f8;
+  --navy-100: #dce6ee;
+  --navy-200: #b7ccdc;
+  --navy-300: #8caec6;
+  --navy-400: #5d87a3;
+  --navy-500: #3c6683;
+  --navy-600: #294d66;
+  --navy-700: #1b384d;
+  --navy-800: #10283a;
+  --navy-900: #081b28;
+  --green-50: #f0f6ea;
+  --green-100: #dcebcb;
+  --green-300: #93be6c;
+  --green-500: #55882f;
+  --green-700: #305019;
+  --gray-50: #f7f9fa;
+  --gray-100: #eef2f4;
+  --gray-200: #dee5e9;
+  --gray-300: #c3ced4;
+  --gray-400: #98a7af;
+  --gray-500: #71828c;
+  --gray-600: #54636c;
+  --gray-700: #3e4a52;
+  --gray-800: #29323a;
+  --gray-900: #171e24;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --color-bg: var(--gray-50);
+  --color-surface: #ffffff;
+  --color-surface-sunken: var(--gray-100);
+  --color-border: var(--gray-200);
+  --color-text-primary: var(--navy-900);
+  --color-text-secondary: var(--gray-600);
+  --color-text-muted: var(--gray-500);
+  --color-primary: var(--navy-700);
+  --color-primary-hover: var(--navy-800);
+  --color-primary-contrast: #ffffff;
+  --color-accent: var(--green-500);
+  --color-header-bg: var(--navy-900);
+  --color-header-text: #ffffff;
+  --radius: 0.65rem;
+  --radius-sm: 0.4rem;
+
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #16312f;
-  background: #f4f8f7;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --color-bg: #0b1116;
+    --color-surface: #131b22;
+    --color-surface-sunken: #182029;
+    --color-border: rgba(255, 255, 255, 0.1);
+    --color-text-primary: #ffffff;
+    --color-text-secondary: var(--gray-300);
+    --color-text-muted: var(--gray-400);
+    --color-primary: var(--navy-400);
+    --color-primary-hover: var(--navy-300);
+    --color-primary-contrast: var(--navy-900);
+    --color-accent: var(--green-300);
+    --color-header-bg: #050a0f;
+    --color-header-text: #ffffff;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0b1116;
+  --color-surface: #131b22;
+  --color-surface-sunken: #182029;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: var(--gray-300);
+  --color-text-muted: var(--gray-400);
+  --color-primary: var(--navy-400);
+  --color-primary-hover: var(--navy-300);
+  --color-primary-contrast: var(--navy-900);
+  --color-accent: var(--green-300);
+  --color-header-bg: #050a0f;
+  --color-header-text: #ffffff;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -18,18 +101,27 @@ button,
 .button-link {
   cursor: pointer;
   border: 0;
-  border-radius: 0.45rem;
+  border-radius: var(--radius-sm);
   padding: 0.65rem 0.9rem;
-  background: #087b72;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
   text-decoration: none;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+button:not(:disabled):hover,
+.button-link:hover {
+  background: var(--color-primary-hover);
 }
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 .button-danger {
-  background: #9c2b2b;
+  background: var(--status-critical);
+}
+.button-danger:not(:disabled):hover {
+  background: #b32f2f;
 }
 .item-actions {
   display: flex;
@@ -37,12 +129,19 @@ button:disabled {
   margin-top: 0.6rem;
 }
 .alert-banner {
-  background: #fdeaea;
-  color: #7a1f1f;
-  border: 1px solid #e3a3a3;
-  border-radius: 0.65rem;
+  background: color-mix(
+    in srgb,
+    var(--status-critical) 12%,
+    var(--color-surface)
+  );
+  color: var(--status-critical);
+  border: 1px solid color-mix(in srgb, var(--status-critical) 35%, transparent);
+  border-radius: var(--radius);
   padding: 0.9rem 1rem;
   margin-bottom: 1.5rem;
+}
+.alert-banner strong {
+  color: var(--color-text-primary);
 }
 .alert-banner ul {
   margin: 0.4rem 0 0;
@@ -60,8 +159,8 @@ header {
   gap: 1rem;
   align-items: center;
   padding: 0.9rem 1.5rem;
-  background: #073b3a;
-  color: white;
+  background: var(--color-header-bg);
+  color: var(--color-header-text);
 }
 header strong {
   font-size: 1.25rem;
@@ -72,46 +171,62 @@ header strong {
   align-items: center;
   gap: 0.7rem;
 }
+.header-actions select {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-header-text);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+}
+.header-actions select:disabled {
+  opacity: 0.6;
+}
 .badge,
 .notice {
   display: inline-block;
-  background: #fff3cd;
-  color: #5f4700;
+  background: color-mix(
+    in srgb,
+    var(--status-warning) 22%,
+    var(--color-surface)
+  );
+  color: #6b4a06;
   padding: 0.3rem 0.55rem;
-  border-radius: 0.35rem;
+  border-radius: var(--radius-sm);
 }
 .connection {
   text-transform: capitalize;
   font-size: 0.85rem;
 }
 .connection.connected {
-  color: #b8f5cd;
+  color: #8fe8ac;
 }
 .connection.recovering,
 .connection.connecting {
-  color: #ffe49a;
+  color: #ffd76e;
 }
 .connection.disconnected {
-  color: #ffd2d2;
+  color: #ff9c9c;
 }
 aside {
   padding: 1rem;
-  background: #dcebea;
+  background: var(--color-surface-sunken);
+  border-right: 1px solid var(--color-border);
 }
 nav {
   display: grid;
   gap: 0.35rem;
 }
 nav a {
-  color: #073b3a;
+  color: var(--color-text-primary);
   padding: 0.65rem;
-  border-radius: 0.4rem;
+  border-radius: var(--radius-sm);
   text-decoration: none;
+  font-weight: 500;
 }
 nav a.active,
 nav a:focus-visible {
-  background: #fff;
-  outline: 2px solid #0b7772;
+  background: var(--color-surface);
+  outline: 2px solid var(--color-primary);
 }
 main {
   padding: clamp(1rem, 4vw, 3rem);
@@ -136,15 +251,15 @@ main {
 .panel,
 .list > article,
 .list > button {
-  border: 1px solid #c7d8d6;
-  border-radius: 0.65rem;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
   padding: 1rem;
 }
 .metric span,
 .list span {
   display: block;
-  color: #52716e;
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 .metric strong {
@@ -165,7 +280,7 @@ main {
   margin-top: 0;
 }
 .empty {
-  color: #52716e;
+  color: var(--color-text-secondary);
 }
 .list {
   display: grid;
@@ -176,7 +291,7 @@ main {
   text-align: left;
 }
 .list > button.selected {
-  outline: 3px solid #087b72;
+  outline: 3px solid var(--color-primary);
 }
 .table-wrap {
   overflow-x: auto;
@@ -184,12 +299,12 @@ main {
 table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--color-surface);
 }
 th,
 td {
   padding: 0.8rem;
-  border-bottom: 1px solid #dcebea;
+  border-bottom: 1px solid var(--color-border);
   text-align: left;
 }
 .history {
@@ -197,15 +312,15 @@ td {
   display: flex;
   gap: 0.2rem;
   align-items: flex-end;
-  background: #fff;
-  border: 1px solid #c7d8d6;
-  border-radius: 0.65rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
   padding: 1rem;
 }
 .history span {
   flex: 1;
   min-width: 0.2rem;
-  background: #087b72;
+  background: var(--color-primary);
   border-radius: 0.2rem 0.2rem 0 0;
 }
 .form {
@@ -219,22 +334,109 @@ td {
 }
 .form input,
 .form select {
-  border: 1px solid #89a7a3;
-  border-radius: 0.35rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
   padding: 0.6rem;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.form input:focus-visible,
+.form select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 .form .checkbox {
   grid-template-columns: auto 1fr;
   align-items: start;
 }
+/* Fixed light surface regardless of theme: the brand wordmark's artwork
+   is dark ink on transparent and only reads correctly on a light card. */
 .login {
   max-width: 38rem;
   margin: 12vh auto;
   padding: 2rem;
-  background: #fff;
-  border: 1px solid #c7d8d6;
+  background: #ffffff;
+  color: var(--navy-900);
+  border: 1px solid var(--gray-200);
   border-radius: 0.75rem;
 }
+.login button {
+  background: var(--navy-700);
+  color: #ffffff;
+}
+.login button:hover {
+  background: var(--navy-800);
+}
+
+.home {
+  min-height: 100vh;
+  background: var(--color-header-bg);
+  color: var(--color-header-text);
+  display: flex;
+  flex-direction: column;
+}
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem clamp(1.5rem, 5vw, 4rem);
+}
+.home-hero {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 2rem clamp(1.5rem, 5vw, 4rem) 4rem;
+}
+.home-hero-inner {
+  max-width: 42rem;
+}
+.home-hero h1 {
+  font-size: clamp(2rem, 4.5vw, 3.25rem);
+  line-height: 1.1;
+  margin: 0 0 1rem;
+}
+.home-hero p {
+  font-size: 1.15rem;
+  color: var(--gray-200);
+  max-width: 34rem;
+  margin: 0 0 2rem;
+}
+/* The hero is always dark regardless of light/dark mode (it mirrors the
+   shield's dark half), so its controls use fixed on-dark colors rather
+   than the theme-following --color-primary/--color-accent tokens. */
+.home-header button,
+.home-hero button {
+  background: var(--green-300);
+  color: var(--navy-900);
+}
+.home-header button:hover,
+.home-hero button:hover {
+  background: #a8cf82;
+}
+.home-features {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  padding: 3rem clamp(1.5rem, 5vw, 4rem);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.5rem;
+}
+.home-features article {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+.home-features h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: var(--color-primary);
+}
+.home-features p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
 @media (max-width: 760px) {
   .shell {
     grid-template: auto auto 1fr / 1fr;
