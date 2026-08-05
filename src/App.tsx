@@ -66,7 +66,15 @@ function useRealtime(organizationId?: string) {
           typeof value === "object" &&
           (value as Record<string, unknown>).eventType === "telemetry.updated"
         )
-          void queryClient.invalidateQueries({ queryKey: ["telemetry"] });
+          // Query keys are "telemetry" on the dashboard overview but
+          // "telemetry:<uuid>" / "telemetry-latest:<uuid>" on the device
+          // details page, so an exact-key invalidation only ever catches
+          // the former. Match by prefix so every telemetry query refreshes.
+          void queryClient.invalidateQueries({
+            predicate: (query) =>
+              typeof query.queryKey[0] === "string" &&
+              query.queryKey[0].startsWith("telemetry"),
+          });
       },
       setState,
       async () => organizationTelemetrySubscriptions(organizationId),

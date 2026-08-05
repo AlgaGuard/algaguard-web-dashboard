@@ -1,4 +1,4 @@
-import { FormEvent, type ReactNode, useEffect, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
@@ -941,8 +941,17 @@ export function DeviceDetailsPage() {
       setSelectedProfileId(assignedProfileId);
     }
   }, [deviceName, selectedProfileId, status.displayName, assignedProfileId]);
+  const setupSubmitting = useRef(false);
   const setup = useMutation({
     mutationFn: async () => {
+      // useMutation's `isPending` flag only updates on the next render, so a
+      // fast double-submit (e.g. Enter followed immediately by a button
+      // click) can invoke this twice before the button disables -- each
+      // invocation would mint its own commandId/expiresAt and the second
+      // one gets rejected with a 409 by command-service's idempotency check.
+      // Guard re-entrancy synchronously instead of relying on render timing.
+      if (setupSubmitting.current) throw new Error("Setup is already saving");
+      setupSubmitting.current = true;
       const normalizedDeviceName = deviceName.trim();
       if (!selectedOrganizationId || !normalizedDeviceName) {
         throw new Error("Device name is required");
@@ -1004,6 +1013,9 @@ export function DeviceDetailsPage() {
       void queryClient.invalidateQueries({
         queryKey: [`device:${deviceUuid}`],
       }),
+    onSettled: () => {
+      setupSubmitting.current = false;
+    },
   });
   const remove = useMutation({
     mutationFn: async () => {
