@@ -102,7 +102,6 @@ function AppShell({ children }: { children: ReactNode }) {
         <div className="brand-lockup">
           <img src="/algaguard-logo-transparent.png" alt="AlgaGuard" />
           <strong>AlgaGuard</strong>
-          <span className="badge">Simulated demo data</span>
         </div>
         <div className="header-actions">
           {organization.organizations.length > 0 ? (

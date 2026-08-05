@@ -129,12 +129,11 @@ describe("dashboard demo", () => {
     view.queryClient.clear();
   });
 
-  it("shows accessible navigation and simulated-data disclosure when signed in", async () => {
+  it("shows accessible navigation when signed in", async () => {
     const view = renderApp();
     expect(
       screen.getByRole("navigation", { name: "Primary" }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/simulated/i).length).toBeGreaterThan(0);
     expect(
       (await screen.findAllByText("No records yet.")).length,
     ).toBeGreaterThan(0);
@@ -303,11 +302,8 @@ describe("dashboard demo", () => {
     expect(JSON.stringify(subscriptions)).not.toContain("device.telemetry");
   });
 
-  it("labels simulated data and exposes all six parameter cards", async () => {
+  it("exposes all six telemetry parameter cards", async () => {
     const view = renderApp();
-    expect(screen.getAllByText(/simulated demo data/i).length).toBeGreaterThan(
-      0,
-    );
     await vi.waitFor(() => {
       for (const label of [
         "Temperature",

@@ -92,10 +92,6 @@ function Page({
       <div className="page-heading">
         <div>
           <h1 id="page-title">{title}</h1>
-          <p className="notice">
-            Development demo — telemetry is SIMULATED and thresholds are not
-            scientifically approved.
-          </p>
         </div>
         {actions}
       </div>
@@ -301,10 +297,6 @@ export function DashboardPage() {
   const ota = usePlatformQuery("ota", "/services/ota/firmware/releases");
   const telemetry = record(record(latest.data).latest);
   const values = record(telemetry.values);
-  const simulated =
-    asRecords(telemetry.qualityFlags).length > 0 ||
-    (Array.isArray(telemetry.qualityFlags) &&
-      telemetry.qualityFlags.includes("SIMULATED"));
   const online = list.filter(
     (device) => device.status === "ONLINE" || device.online === true,
   ).length;
@@ -319,8 +311,7 @@ export function DashboardPage() {
           value={telemetry.sequence ?? telemetry.sampleSequence}
         />
       </div>
-      <h2>Latest simulated telemetry</h2>
-      {simulated ? <p className="badge">Simulated demo data</p> : null}
+      <h2>Latest telemetry</h2>
       {latest.isLoading ? (
         <Loading />
       ) : latest.isError ? (
@@ -1307,8 +1298,7 @@ export function ProfilesPage() {
   return (
     <Page title="Profiles">
       <p className="notice">
-        Profile values in this demo are user-defined and are not scientifically
-        approved.
+        Profile values are user-defined and are not scientifically approved.
       </p>
       <p>
         Create algae profiles here, then assign one to a device from that
@@ -1478,10 +1468,7 @@ export function CommandPage() {
   }
   return (
     <Page title="Safe commands">
-      <p>
-        Remote factory reset and reboot are intentionally not available in this
-        demo.
-      </p>
+      <p>Remote factory reset and reboot are intentionally not available.</p>
       <form className="panel form" onSubmit={submit}>
         <label>
           Device UUID
@@ -1514,7 +1501,7 @@ export function CommandPage() {
             checked={confirmation}
             onChange={(event) => setConfirmation(event.target.checked)}
           />
-          I confirm this changes the demo indicator only.
+          I confirm this changes the device indicator only.
         </label>
         <button disabled={create.isPending || !deviceUuid} type="submit">
           {create.isPending ? "Sending…" : "Create command"}
