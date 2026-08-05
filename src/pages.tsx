@@ -291,8 +291,14 @@ export function DashboardPage() {
       : "",
     !!demoDevice,
   );
-  const commands = usePlatformQuery("commands", "/services/command/commands");
-  const ota = usePlatformQuery("ota", "/services/ota/releases");
+  const commands = usePlatformQuery(
+    "commands",
+    demoDevice
+      ? `/services/command/devices/${encodeURIComponent(String(demoDevice.deviceId))}/commands`
+      : "",
+    !!demoDevice,
+  );
+  const ota = usePlatformQuery("ota", "/services/ota/firmware/releases");
   const telemetry = record(record(latest.data).latest);
   const values = record(telemetry.values);
   const simulated =
@@ -1420,15 +1426,40 @@ export function ProfilesPage() {
 export function CommandPage() {
   const client = useQueryClient();
   const [deviceUuid, setDeviceUuid] = useState("");
+  const [lastDeviceId, setLastDeviceId] = useState("");
   const [indicator, setIndicator] = useState("ON");
   const [confirmation, setConfirmation] = useState(false);
-  const commands = usePlatformQuery("commands", "/services/command/commands");
+  const commands = usePlatformQuery(
+    "commands",
+    lastDeviceId
+      ? `/services/command/devices/${encodeURIComponent(lastDeviceId)}/commands`
+      : "",
+    !!lastDeviceId,
+  );
   const create = useMutation({
-    mutationFn: (input: Json) =>
-      apiRequest<Json>("/services/command/commands", undefined, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+    mutationFn: async (input: { commandType: string; parameters: Json }) => {
+      const device = await apiRequest<Json>(
+        `/services/device/devices/${encodeURIComponent(deviceUuid)}`,
+      );
+      const deviceId = String(device.deviceId ?? "");
+      if (!/^AG-[0-9]{6}$/.test(deviceId))
+        throw new Error("Device UUID did not resolve to a paired device");
+      const result = await apiRequest<Json>(
+        `/services/command/devices/${encodeURIComponent(deviceId)}/commands`,
+        undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            commandId: crypto.randomUUID(),
+            commandType: input.commandType,
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+            parameters: input.parameters,
+          }),
+        },
+      );
+      setLastDeviceId(deviceId);
+      return result;
+    },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["commands"] }),
   });
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -1438,10 +1469,11 @@ export function CommandPage() {
       "REQUEST_STATUS";
     if (commandType === "SET_INDICATOR_STATE" && !confirmation) return;
     create.mutate({
-      deviceUuid,
       commandType,
       parameters:
-        commandType === "SET_INDICATOR_STATE" ? { state: indicator } : {},
+        commandType === "SET_INDICATOR_STATE"
+          ? { red: indicator, green: indicator, blue: indicator }
+          : {},
     });
   }
   return (
@@ -1500,7 +1532,7 @@ export function CommandPage() {
 }
 
 export function OtaPage() {
-  const releases = usePlatformQuery("ota", "/services/ota/releases");
+  const releases = usePlatformQuery("ota", "/services/ota/firmware/releases");
   return (
     <Page title="Development OTA">
       <p>
