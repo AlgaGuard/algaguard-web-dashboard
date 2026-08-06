@@ -80,10 +80,12 @@ const text = (value: unknown) =>
 
 function Page({
   title,
+  subtitle,
   children,
   actions,
 }: {
   title: string;
+  subtitle?: string;
   children: ReactNode;
   actions?: ReactNode;
 }) {
@@ -92,6 +94,7 @@ function Page({
       <div className="page-heading">
         <div>
           <h1 id="page-title">{title}</h1>
+          {subtitle ? <p className="empty">{subtitle}</p> : null}
         </div>
         {actions}
       </div>
@@ -203,6 +206,47 @@ const PARAM_ICONS: Record<
   ),
 };
 
+const ONLINE_ICON = (
+  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path
+      d="M4 8.5a8.5 8.5 0 0 1 12 0M6.8 11.3a4.7 4.7 0 0 1 6.4 0"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+    <circle cx="10" cy="14.5" r="1.3" fill="currentColor" />
+  </svg>
+);
+
+const ALERT_ICON = (
+  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path
+      d="M10 3a4.5 4.5 0 0 0-4.5 4.5v2.6L4 13.5h12l-1.5-3.4V7.5A4.5 4.5 0 0 0 10 3Z"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8.3 16a1.9 1.9 0 0 0 3.4 0"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const CHART_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M4 18V6M4 18h16M8 14l3-3 3 2 4-5"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const DEVICE_ICON = (
   <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
     <rect
@@ -226,21 +270,45 @@ const DEVICE_ICON = (
 function ValueCard({
   label,
   value,
+  unit,
   paramKey,
+  icon,
+  statusVariant,
+  statusLabel,
+  simulated,
 }: {
   label: string;
   value: unknown;
+  unit?: string;
   paramKey?: keyof typeof PARAM_ICONS;
+  icon?: ReactNode;
+  statusVariant?: "good" | "warning" | "serious" | "critical";
+  statusLabel?: string;
+  simulated?: boolean;
 }) {
   return (
-    <article className="metric">
-      {paramKey ? (
-        <span className={`icon-circle icon-circle--${paramKey}`}>
-          {PARAM_ICONS[paramKey]}
+    <article className={`metric${simulated ? " metric--simulated" : ""}`}>
+      <div className="metric-head">
+        <span className="metric-label">{label}</span>
+        {paramKey ? (
+          <span className={`icon-circle icon-circle--${paramKey}`}>
+            {PARAM_ICONS[paramKey]}
+          </span>
+        ) : icon ? (
+          <span className="icon-circle icon-circle--device">{icon}</span>
+        ) : null}
+      </div>
+      <strong>
+        {text(value)}
+        {unit && value != null ? <small>{unit}</small> : null}
+      </strong>
+      {statusVariant ? (
+        <span className={`status-pill status-pill--${statusVariant}`}>
+          {statusLabel ?? statusVariant}
         </span>
+      ) : simulated ? (
+        <span className="badge-simulated">Simulated</span>
       ) : null}
-      <span>{label}</span>
-      <strong>{text(value)}</strong>
     </article>
   );
 }
@@ -335,28 +403,40 @@ export function HomePage() {
 
 export function LoginPage() {
   return (
-    <section className="login">
-      <img
-        className="brand-wordmark"
-        src="/algaguard-logo-tagline-transparent.png"
-        alt="AlgaGuard"
-      />
-      <h1>Sign in to AlgaGuard</h1>
-      <p>
-        Use the configured local Keycloak realm. Tokens are managed by Keycloak
-        and are never placed in local storage by this dashboard.
-      </p>
-      <button
-        type="button"
-        onClick={() =>
-          void keycloak.login({
-            redirectUri: `${window.location.origin}/auth/callback`,
-          })
-        }
-      >
-        Sign in with Keycloak
-      </button>
-    </section>
+    <div className="login-page">
+      <section className="login">
+        <span className="login-badge">
+          <img src="/algaguard-logo-transparent.png" alt="" />
+        </span>
+        <h1>Sign in to AlgaGuard</h1>
+        <p className="login-subtitle">Algae tank monitoring platform</p>
+        <p>
+          Use the configured local Keycloak realm. Tokens are managed by
+          Keycloak and are never placed in local storage by this dashboard.
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            void keycloak.login({
+              redirectUri: `${window.location.origin}/auth/callback`,
+            })
+          }
+        >
+          Sign in with Keycloak
+        </button>
+        <div className="login-footer">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M10 2 4 4.5v4c0 4 2.6 6.7 6 8 3.4-1.3 6-4 6-8v-4Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Secure Keycloak sign-in
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -421,25 +501,69 @@ export function DashboardPage() {
   const online = list.filter(
     (device) => device.status === "ONLINE" || device.online === true,
   ).length;
+  const offline = Math.max(0, list.length - online);
+  const simulated = telemetry.source === "SIMULATED_DEMO";
   return (
-    <Page title="Dashboard">
+    <Page
+      title="System Overview"
+      subtitle="Real-time status of every device across the active organization."
+      actions={
+        <span className="status-pill status-pill--good">System online</span>
+      }
+    >
+      {simulated ? (
+        <p className="simulated-banner">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M7 3h6l1.5 8a4.5 4.5 0 1 1-9 0Z"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinejoin="round"
+            />
+            <path d="M6.5 12.5h7" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+          Simulated demo data active. Changes will not affect live hardware.
+        </p>
+      ) : null}
       <div className="cards">
-        <ValueCard label="Devices" value={list.length} />
-        <ValueCard label="Online" value={online} />
-        <ValueCard label="Offline" value={Math.max(0, list.length - online)} />
+        <ValueCard
+          label="Total devices"
+          value={list.length}
+          icon={DEVICE_ICON}
+        />
+        <ValueCard
+          label="Online"
+          value={online}
+          icon={ONLINE_ICON}
+          statusVariant={online > 0 ? "good" : undefined}
+          statusLabel="Live"
+        />
+        <ValueCard
+          label="Offline"
+          value={offline}
+          icon={ALERT_ICON}
+          statusVariant={offline > 0 ? "warning" : undefined}
+          statusLabel="Attention"
+        />
         <ValueCard
           label="Last sequence"
           value={telemetry.sequence ?? telemetry.sampleSequence}
+          simulated={simulated}
         />
       </div>
-      <h2>
-        Latest telemetry
-        {telemetry.source === "SIMULATED_DEMO" ? (
-          <span className="badge-simulated" style={{ marginLeft: "0.6rem" }}>
-            Simulated demo data
-          </span>
-        ) : null}
-      </h2>
+
+      <div className="panel chart-placeholder" style={{ margin: "1.5rem 0" }}>
+        <div className="chart-placeholder-head">
+          <h2>Telemetry trend</h2>
+          <span className="pill-button">Last 24 hours</span>
+        </div>
+        <div className="chart-placeholder-body">
+          {CHART_ICON}
+          <span>Trend charting is coming soon</span>
+        </div>
+      </div>
+
+      <h2>Latest telemetry</h2>
       {latest.isLoading ? (
         <Loading />
       ) : latest.isError ? (
@@ -449,48 +573,43 @@ export function DashboardPage() {
           <ValueCard
             label="Temperature"
             paramKey="temp"
-            value={
-              values.temperatureC == null
-                ? undefined
-                : `${text(values.temperatureC)} °C`
-            }
+            unit=" °C"
+            value={values.temperatureC}
+            simulated={simulated}
           />
-          <ValueCard label="pH" paramKey="ph" value={values.ph} />
+          <ValueCard
+            label="pH"
+            paramKey="ph"
+            value={values.ph}
+            simulated={simulated}
+          />
           <ValueCard
             label="Light"
             paramKey="light"
-            value={
-              values.lightLux == null
-                ? undefined
-                : `${text(values.lightLux)} lux`
-            }
+            unit=" lux"
+            value={values.lightLux}
+            simulated={simulated}
           />
           <ValueCard
             label="Nitrate"
             paramKey="nitrate"
-            value={
-              values.nitrateMgL == null
-                ? undefined
-                : `${text(values.nitrateMgL)} mg/L`
-            }
+            unit=" mg/L"
+            value={values.nitrateMgL}
+            simulated={simulated}
           />
           <ValueCard
             label="Phosphate"
             paramKey="phosphate"
-            value={
-              values.phosphateMgL == null
-                ? undefined
-                : `${text(values.phosphateMgL)} mg/L`
-            }
+            unit=" mg/L"
+            value={values.phosphateMgL}
+            simulated={simulated}
           />
           <ValueCard
             label="Potassium"
             paramKey="potassium"
-            value={
-              values.potassiumMgL == null
-                ? undefined
-                : `${text(values.potassiumMgL)} mg/L`
-            }
+            unit=" mg/L"
+            value={values.potassiumMgL}
+            simulated={simulated}
           />
         </div>
       )}
@@ -884,6 +1003,14 @@ export function InvitationsPage() {
   );
 }
 
+function deviceStatusVariant(status: string) {
+  return status === "ONLINE"
+    ? "good"
+    : status === "OFFLINE"
+      ? "critical"
+      : "warning";
+}
+
 export function DevicesPage() {
   const { selectedOrganizationId, loading: organizationLoading } =
     useOrganization();
@@ -894,9 +1021,46 @@ export function DevicesPage() {
       : "",
     !!selectedOrganizationId,
   );
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "online" | "offline"
+  >("all");
   const values = responseItems(devices.data);
+  const query = search.trim().toLowerCase();
+  const filtered = values.filter((device) => {
+    const status = String(device.status ?? "").toUpperCase();
+    if (statusFilter === "online" && status !== "ONLINE") return false;
+    if (statusFilter === "offline" && status !== "OFFLINE") return false;
+    if (!query) return true;
+    const haystack =
+      `${text(device.displayName)} ${text(device.deviceId)}`.toLowerCase();
+    return haystack.includes(query);
+  });
   return (
-    <Page title="Devices">
+    <Page
+      title="Device Fleet"
+      subtitle="Manage and monitor all deployed hardware nodes."
+      actions={
+        <div className="segmented">
+          {(
+            [
+              ["all", "All"],
+              ["online", "Online"],
+              ["offline", "Offline"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={statusFilter === value ? "active" : undefined}
+              onClick={() => setStatusFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      }
+    >
       {organizationLoading || devices.isLoading ? (
         <Loading />
       ) : !selectedOrganizationId ? (
@@ -904,53 +1068,101 @@ export function DevicesPage() {
       ) : devices.isError ? (
         <ErrorState error={devices.error} />
       ) : values.length ? (
-        <div className="device-grid">
-          {values.map((device) => {
-            const uuid = text(device.deviceUuid ?? device.id);
-            const status = String(device.status ?? "").toUpperCase();
-            const statusVariant =
-              status === "ONLINE"
-                ? "good"
-                : status === "OFFLINE"
-                  ? "critical"
-                  : "warning";
-            return (
-              <article key={uuid} className="device-card">
-                <div className="device-card-header">
-                  <span className="icon-circle icon-circle--device">
-                    {DEVICE_ICON}
-                  </span>
-                  <div>
-                    <h3>{text(device.displayName ?? device.deviceId)}</h3>
-                    {device.displayName ? (
-                      <small>{text(device.deviceId)}</small>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="device-card-meta">
-                  <span className={`status-pill status-pill--${statusVariant}`}>
-                    {text(device.status) === "—"
-                      ? "Unknown"
-                      : text(device.status)}
-                  </span>
-                  <span>{text(device.profileName ?? device.profileId)}</span>
-                </div>
-                <div className="device-card-meta">
-                  <span>Last seen</span>
-                  <span>{text(device.lastSeenAt ?? device.lastSeen)}</span>
-                </div>
-                <Link
-                  className="button-link"
-                  to={`/devices/${encodeURIComponent(uuid)}`}
-                >
-                  Open
-                </Link>
-              </article>
-            );
-          })}
-        </div>
+        <>
+          <label className="search-input" style={{ marginBottom: "1rem" }}>
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle
+                cx="9"
+                cy="9"
+                r="5.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path
+                d="m17 17-3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+            <input
+              type="search"
+              placeholder="Search devices…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              aria-label="Search devices"
+            />
+          </label>
+          {filtered.length ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name / ID</th>
+                    <th>Status</th>
+                    <th>Profile</th>
+                    <th>Last update</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((device) => {
+                    const uuid = text(device.deviceUuid ?? device.id);
+                    const status = String(device.status ?? "").toUpperCase();
+                    return (
+                      <tr key={uuid}>
+                        <td>
+                          <div className="row-identity">
+                            <span className="icon-circle icon-circle--device">
+                              {DEVICE_ICON}
+                            </span>
+                            <div>
+                              <strong>
+                                {text(device.displayName ?? device.deviceId)}
+                              </strong>
+                              {device.displayName ? (
+                                <small>{text(device.deviceId)}</small>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span
+                            className={`status-pill status-pill--${deviceStatusVariant(status)}`}
+                          >
+                            {text(device.status) === "—"
+                              ? "Unknown"
+                              : text(device.status)}
+                          </span>
+                        </td>
+                        <td>{text(device.profileName ?? device.profileId)}</td>
+                        <td>{text(device.lastSeenAt ?? device.lastSeen)}</td>
+                        <td>
+                          <Link
+                            className="button-link"
+                            to={`/devices/${encodeURIComponent(uuid)}`}
+                          >
+                            Open
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <Empty>No devices match this search.</Empty>
+          )}
+        </>
       ) : (
-        <Empty>No devices have been claimed for this organization.</Empty>
+        <div className="empty-cta">
+          <strong>No devices yet</strong>
+          <p>
+            Pair a device from the AlgaGuard mobile app to see it here — the web
+            dashboard doesn&apos;t claim devices directly.
+          </p>
+        </div>
       )}
     </Page>
   );
