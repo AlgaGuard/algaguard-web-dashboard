@@ -115,9 +115,130 @@ function ErrorState({ error }: { error: unknown }) {
 function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
-function ValueCard({ label, value }: { label: string; value: unknown }) {
+const PARAM_ICONS: Record<
+  "temp" | "ph" | "light" | "nitrate" | "phosphate" | "potassium",
+  ReactNode
+> = {
+  temp: (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M9 3.5a1.5 1.5 0 0 1 3 0v6.9a3.5 3.5 0 1 1-3 0Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+    </svg>
+  ),
+  ph: (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M7 3h6l1.5 8a4.5 4.5 0 1 1-9 0Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M6.5 12.5h7" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  ),
+  light: (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <circle cx="10" cy="10" r="3.4" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M15.1 4.9l-1.4 1.4M6.3 13.7l-1.4 1.4M15.1 15.1l-1.4-1.4M6.3 6.3 4.9 4.9"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  nitrate: (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M10 3v6l3.5 6a2 2 0 0 1-1.7 3h-3.6a2 2 0 0 1-1.7-3L10 9"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 3h4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  phosphate: (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M10 3c2.5 3 4.5 6 4.5 8.5a4.5 4.5 0 1 1-9 0C5.5 9 7.5 6 10 3Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  potassium: (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <circle
+        cx="13"
+        cy="6.5"
+        r="1.3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle
+        cx="8.5"
+        cy="14"
+        r="1.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M9 8.8 8 12.6M9 7l2.6-1"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+};
+
+const DEVICE_ICON = (
+  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <rect
+      x="6"
+      y="6"
+      width="8"
+      height="8"
+      rx="1.2"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M8 2.5v2.2M12 2.5v2.2M8 15.3v2.2M12 15.3v2.2M2.5 8v2.2M2.5 12v2.2M15.3 8v2.2M15.3 12v2.2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+function ValueCard({
+  label,
+  value,
+  paramKey,
+}: {
+  label: string;
+  value: unknown;
+  paramKey?: keyof typeof PARAM_ICONS;
+}) {
   return (
     <article className="metric">
+      {paramKey ? (
+        <span className={`icon-circle icon-circle--${paramKey}`}>
+          {PARAM_ICONS[paramKey]}
+        </span>
+      ) : null}
       <span>{label}</span>
       <strong>{text(value)}</strong>
     </article>
@@ -311,7 +432,14 @@ export function DashboardPage() {
           value={telemetry.sequence ?? telemetry.sampleSequence}
         />
       </div>
-      <h2>Latest telemetry</h2>
+      <h2>
+        Latest telemetry
+        {telemetry.source === "SIMULATED_DEMO" ? (
+          <span className="badge-simulated" style={{ marginLeft: "0.6rem" }}>
+            Simulated demo data
+          </span>
+        ) : null}
+      </h2>
       {latest.isLoading ? (
         <Loading />
       ) : latest.isError ? (
@@ -320,15 +448,17 @@ export function DashboardPage() {
         <div className="cards telemetry">
           <ValueCard
             label="Temperature"
+            paramKey="temp"
             value={
               values.temperatureC == null
                 ? undefined
                 : `${text(values.temperatureC)} °C`
             }
           />
-          <ValueCard label="pH" value={values.ph} />
+          <ValueCard label="pH" paramKey="ph" value={values.ph} />
           <ValueCard
             label="Light"
+            paramKey="light"
             value={
               values.lightLux == null
                 ? undefined
@@ -337,6 +467,7 @@ export function DashboardPage() {
           />
           <ValueCard
             label="Nitrate"
+            paramKey="nitrate"
             value={
               values.nitrateMgL == null
                 ? undefined
@@ -345,6 +476,7 @@ export function DashboardPage() {
           />
           <ValueCard
             label="Phosphate"
+            paramKey="phosphate"
             value={
               values.phosphateMgL == null
                 ? undefined
@@ -353,6 +485,7 @@ export function DashboardPage() {
           />
           <ValueCard
             label="Potassium"
+            paramKey="potassium"
             value={
               values.potassiumMgL == null
                 ? undefined
@@ -771,43 +904,50 @@ export function DevicesPage() {
       ) : devices.isError ? (
         <ErrorState error={devices.error} />
       ) : values.length ? (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Device</th>
-                <th>Status</th>
-                <th>Profile</th>
-                <th>Last seen</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {values.map((device, index) => {
-                const uuid = text(device.deviceUuid ?? device.id);
-                return (
-                  <tr key={uuid}>
-                    <td>
-                      <strong>
-                        {text(device.displayName ?? device.deviceId)}
-                      </strong>
-                      {device.displayName ? (
-                        <small>{text(device.deviceId)}</small>
-                      ) : null}
-                    </td>
-                    <td>{text(device.status)}</td>
-                    <td>{text(device.profileName ?? device.profileId)}</td>
-                    <td>{text(device.lastSeenAt ?? device.lastSeen)}</td>
-                    <td>
-                      <Link to={`/devices/${encodeURIComponent(uuid)}`}>
-                        Open
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="device-grid">
+          {values.map((device) => {
+            const uuid = text(device.deviceUuid ?? device.id);
+            const status = String(device.status ?? "").toUpperCase();
+            const statusVariant =
+              status === "ONLINE"
+                ? "good"
+                : status === "OFFLINE"
+                  ? "critical"
+                  : "warning";
+            return (
+              <article key={uuid} className="device-card">
+                <div className="device-card-header">
+                  <span className="icon-circle icon-circle--device">
+                    {DEVICE_ICON}
+                  </span>
+                  <div>
+                    <h3>{text(device.displayName ?? device.deviceId)}</h3>
+                    {device.displayName ? (
+                      <small>{text(device.deviceId)}</small>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="device-card-meta">
+                  <span className={`status-pill status-pill--${statusVariant}`}>
+                    {text(device.status) === "—"
+                      ? "Unknown"
+                      : text(device.status)}
+                  </span>
+                  <span>{text(device.profileName ?? device.profileId)}</span>
+                </div>
+                <div className="device-card-meta">
+                  <span>Last seen</span>
+                  <span>{text(device.lastSeenAt ?? device.lastSeen)}</span>
+                </div>
+                <Link
+                  className="button-link"
+                  to={`/devices/${encodeURIComponent(uuid)}`}
+                >
+                  Open
+                </Link>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <Empty>No devices have been claimed for this organization.</Empty>

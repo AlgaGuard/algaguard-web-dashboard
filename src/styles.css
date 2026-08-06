@@ -206,12 +206,19 @@ button:disabled {
   display: grid;
   grid-template: 1fr / 16rem minmax(0, 1fr);
 }
+.shell-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-width: 0;
+}
 header {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
   align-items: center;
   padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
 }
 header strong {
   font-size: 1.25rem;
@@ -327,6 +334,9 @@ header strong {
 .icon-circle--potassium {
   color: var(--param-potassium-fg);
 }
+.icon-circle--device {
+  color: var(--color-primary);
+}
 .connection {
   text-transform: capitalize;
   font-size: 0.85rem;
@@ -363,6 +373,11 @@ nav a {
   text-decoration: none;
   font-weight: 500;
 }
+nav a svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
 nav a.active,
 nav a:focus-visible {
   background: var(--color-primary);
@@ -370,6 +385,7 @@ nav a:focus-visible {
   outline: none;
 }
 main {
+  flex: 1;
   padding: clamp(1rem, 4vw, 3rem);
   overflow: auto;
 }
@@ -398,11 +414,17 @@ main {
   box-shadow: var(--shadow-card);
   padding: 1.1rem;
 }
-.metric span,
-.list span {
+.metric span:not(.icon-circle),
+.list span:not(.icon-circle) {
   display: block;
   color: var(--color-text-secondary);
   font-size: 0.85rem;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 .metric strong {
   display: block;
