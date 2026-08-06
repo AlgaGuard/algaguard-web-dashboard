@@ -10,11 +10,16 @@
   --navy-700: #1b384d;
   --navy-800: #10283a;
   --navy-900: #081b28;
-  --green-50: #f0f6ea;
-  --green-100: #dcebcb;
-  --green-300: #93be6c;
-  --green-500: #55882f;
-  --green-700: #305019;
+  --green-50: #eaf7ef;
+  --green-100: #d3eedd;
+  --green-200: #a8ddbb;
+  --green-300: #7bc796;
+  --green-400: #4fae73;
+  --green-500: #2f8f57;
+  --green-600: #227a47;
+  --green-700: #1b5e38;
+  --green-800: #144a2c;
+  --green-900: #0d3320;
   --gray-50: #f7f9fa;
   --gray-100: #eef2f4;
   --gray-200: #dee5e9;
@@ -29,61 +34,109 @@
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
+  --purple-50: #f4effc;
+  --purple-100: #e6dbf8;
+  --purple-500: #7c4fd6;
+  --purple-700: #5b32ad;
 
-  --color-bg: var(--gray-50);
+  /* Six telemetry parameters, each a fixed icon color (the pastel circle
+     background is computed from it via color-mix, see .icon-circle below).
+     Values are the dataviz skill's validated categorical hue order, skipping
+     the green slot (collides with the brand primary) and the red slot
+     (collides with --status-critical); validated with
+     scripts/validate_palette.js against this file's light/dark surfaces.
+     Never reuse purple here -- it is reserved for the simulated/dev-data
+     convention below. */
+  --param-temp-fg: #eb6834;
+  --param-ph-fg: #2a78d6;
+  --param-light-fg: #eda100;
+  --param-nitrate-fg: #1baf7a;
+  --param-phosphate-fg: #e87ba4;
+  --param-potassium-fg: #4a3aa7;
+
+  --color-bg: var(--green-50);
+  --color-bg-gradient: linear-gradient(
+    180deg,
+    #f2fbf5 0%,
+    #e6f5ea 55%,
+    #dcefe2 100%
+  );
   --color-surface: #ffffff;
   --color-surface-sunken: var(--gray-100);
   --color-border: var(--gray-200);
   --color-text-primary: var(--navy-900);
   --color-text-secondary: var(--gray-600);
   --color-text-muted: var(--gray-500);
-  --color-primary: var(--navy-700);
-  --color-primary-hover: var(--navy-800);
+  --color-primary: var(--green-700);
+  --color-primary-hover: var(--green-800);
   --color-primary-contrast: #ffffff;
-  --color-accent: var(--green-500);
-  --color-header-bg: var(--navy-900);
+  --color-accent: var(--navy-700);
+  --color-header-bg: var(--green-800);
   --color-header-text: #ffffff;
-  --radius: 0.65rem;
+  --color-simulated-bg: var(--purple-50);
+  --color-simulated-text: var(--purple-700);
+  --radius: 1.125rem;
+  --radius-lg: 1.25rem;
   --radius-sm: 0.4rem;
+  --shadow-card:
+    0 1px 2px rgba(16, 40, 26, 0.04), 0 8px 24px rgba(16, 40, 26, 0.08);
 
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   color: var(--color-text-primary);
-  background: var(--color-bg);
+  background: var(--color-bg-gradient);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --color-bg: #0b1116;
-    --color-surface: #131b22;
-    --color-surface-sunken: #182029;
+    --color-bg: #0b1611;
+    --color-bg-gradient: linear-gradient(180deg, #0b140f 0%, #0e1a13 100%);
+    --color-surface: #13201a;
+    --color-surface-sunken: #182920;
     --color-border: rgba(255, 255, 255, 0.1);
     --color-text-primary: #ffffff;
     --color-text-secondary: var(--gray-300);
     --color-text-muted: var(--gray-400);
-    --color-primary: var(--navy-400);
-    --color-primary-hover: var(--navy-300);
-    --color-primary-contrast: var(--navy-900);
-    --color-accent: var(--green-300);
-    --color-header-bg: #050a0f;
+    --color-primary: var(--green-300);
+    --color-primary-hover: var(--green-400);
+    --color-primary-contrast: var(--green-900);
+    --color-accent: var(--navy-300);
+    --color-header-bg: #081209;
     --color-header-text: #ffffff;
+    --color-simulated-bg: rgba(124, 79, 214, 0.18);
+    --color-simulated-text: #c6aef2;
+    --param-temp-fg: #d95926;
+    --param-ph-fg: #3987e5;
+    --param-light-fg: #c98500;
+    --param-nitrate-fg: #199e70;
+    --param-phosphate-fg: #d55181;
+    --param-potassium-fg: #9085e9;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #0b1116;
-  --color-surface: #131b22;
-  --color-surface-sunken: #182029;
+  --color-bg: #0b1611;
+  --color-bg-gradient: linear-gradient(180deg, #0b140f 0%, #0e1a13 100%);
+  --color-surface: #13201a;
+  --color-surface-sunken: #182920;
   --color-border: rgba(255, 255, 255, 0.1);
   --color-text-primary: #ffffff;
   --color-text-secondary: var(--gray-300);
   --color-text-muted: var(--gray-400);
-  --color-primary: var(--navy-400);
-  --color-primary-hover: var(--navy-300);
-  --color-primary-contrast: var(--navy-900);
-  --color-accent: var(--green-300);
-  --color-header-bg: #050a0f;
+  --color-primary: var(--green-300);
+  --color-primary-hover: var(--green-400);
+  --color-primary-contrast: var(--green-900);
+  --color-accent: var(--navy-300);
+  --color-header-bg: #081209;
   --color-header-text: #ffffff;
+  --color-simulated-bg: rgba(124, 79, 214, 0.18);
+  --color-simulated-text: #c6aef2;
+  --param-temp-fg: #d95926;
+  --param-ph-fg: #3987e5;
+  --param-light-fg: #c98500;
+  --param-nitrate-fg: #199e70;
+  --param-phosphate-fg: #d55181;
+  --param-potassium-fg: #9085e9;
 }
 
 * {
@@ -91,6 +144,7 @@
 }
 body {
   margin: 0;
+  background: var(--color-bg-gradient);
 }
 button,
 input,
@@ -121,7 +175,7 @@ button:disabled {
   background: var(--status-critical);
 }
 .button-danger:not(:disabled):hover {
-  background: #b32f2f;
+  background: color-mix(in srgb, var(--status-critical) 85%, black);
 }
 .item-actions {
   display: flex;
@@ -150,17 +204,14 @@ button:disabled {
 .shell {
   min-height: 100vh;
   display: grid;
-  grid-template: auto 1fr / 15rem minmax(0, 1fr);
+  grid-template: 1fr / 16rem minmax(0, 1fr);
 }
 header {
-  grid-column: 1 / -1;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   align-items: center;
   padding: 0.9rem 1.5rem;
-  background: var(--color-header-bg);
-  color: var(--color-header-text);
 }
 header strong {
   font-size: 1.25rem;
@@ -172,9 +223,9 @@ header strong {
   gap: 0.7rem;
 }
 .header-actions select {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--color-header-text);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.45rem 0.6rem;
 }
@@ -189,44 +240,134 @@ header strong {
     var(--status-warning) 22%,
     var(--color-surface)
   );
-  color: #6b4a06;
+  color: color-mix(in srgb, var(--status-warning) 55%, black);
   padding: 0.3rem 0.55rem;
   border-radius: var(--radius-sm);
+}
+.badge-simulated {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--color-simulated-bg);
+  color: var(--color-simulated-text);
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.status-pill::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+.status-pill--good {
+  background: color-mix(in srgb, var(--status-good) 16%, var(--color-surface));
+  color: var(--status-good);
+}
+.status-pill--warning {
+  background: color-mix(
+    in srgb,
+    var(--status-warning) 16%,
+    var(--color-surface)
+  );
+  color: color-mix(in srgb, var(--status-warning) 65%, black);
+}
+.status-pill--serious {
+  background: color-mix(
+    in srgb,
+    var(--status-serious) 16%,
+    var(--color-surface)
+  );
+  color: var(--status-serious);
+}
+.status-pill--critical {
+  background: color-mix(
+    in srgb,
+    var(--status-critical) 16%,
+    var(--color-surface)
+  );
+  color: var(--status-critical);
+}
+.icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, currentColor 18%, var(--color-surface));
+}
+.icon-circle--temp {
+  color: var(--param-temp-fg);
+}
+.icon-circle--ph {
+  color: var(--param-ph-fg);
+}
+.icon-circle--light {
+  color: var(--param-light-fg);
+}
+.icon-circle--nitrate {
+  color: var(--param-nitrate-fg);
+}
+.icon-circle--phosphate {
+  color: var(--param-phosphate-fg);
+}
+.icon-circle--potassium {
+  color: var(--param-potassium-fg);
 }
 .connection {
   text-transform: capitalize;
   font-size: 0.85rem;
 }
 .connection.connected {
-  color: #8fe8ac;
+  color: var(--green-300);
 }
 .connection.recovering,
 .connection.connecting {
-  color: #ffd76e;
+  color: var(--status-warning);
 }
 .connection.disconnected {
-  color: #ff9c9c;
+  color: var(--status-critical);
 }
 aside {
-  padding: 1rem;
-  background: var(--color-surface-sunken);
+  padding: 1.25rem 1rem;
+  background: var(--color-surface);
   border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 nav {
   display: grid;
   gap: 0.35rem;
 }
 nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   color: var(--color-text-primary);
-  padding: 0.65rem;
+  padding: 0.65rem 0.75rem;
   border-radius: var(--radius-sm);
   text-decoration: none;
   font-weight: 500;
 }
 nav a.active,
 nav a:focus-visible {
-  background: var(--color-surface);
-  outline: 2px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  outline: none;
 }
 main {
   padding: clamp(1rem, 4vw, 3rem);
@@ -254,7 +395,8 @@ main {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
-  padding: 1rem;
+  box-shadow: var(--shadow-card);
+  padding: 1.1rem;
 }
 .metric span,
 .list span {
@@ -307,6 +449,53 @@ td {
   border-bottom: 1px solid var(--color-border);
   text-align: left;
 }
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+.device-card {
+  display: grid;
+  gap: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  padding: 1.1rem;
+}
+.device-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.device-card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.device-card-header small {
+  display: block;
+  color: var(--color-text-muted);
+}
+.device-card-progress {
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+}
+.device-card-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+.device-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
 .history {
   height: 12rem;
   display: flex;
@@ -315,6 +504,7 @@ td {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   padding: 1rem;
 }
 .history span {
@@ -358,20 +548,29 @@ td {
   background: #ffffff;
   color: var(--navy-900);
   border: 1px solid var(--gray-200);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 .login button {
-  background: var(--navy-700);
+  background: var(--green-700);
   color: #ffffff;
 }
 .login button:hover {
-  background: var(--navy-800);
+  background: var(--green-800);
 }
 
+/* The marketing hero is always a dark forest-green surface regardless of
+   light/dark mode (a deliberate brand statement independent of the app
+   shell's theme toggle), so its controls use fixed on-dark colors rather
+   than the theme-following --color-primary/--color-accent tokens. */
 .home {
   min-height: 100vh;
-  background: var(--color-header-bg);
-  color: var(--color-header-text);
+  background: linear-gradient(
+    160deg,
+    var(--green-900) 0%,
+    var(--green-800) 100%
+  );
+  color: #ffffff;
   display: flex;
   flex-direction: column;
 }
@@ -397,24 +596,21 @@ td {
 }
 .home-hero p {
   font-size: 1.15rem;
-  color: var(--gray-200);
+  color: var(--green-100);
   max-width: 34rem;
   margin: 0 0 2rem;
 }
-/* The hero is always dark regardless of light/dark mode (it mirrors the
-   shield's dark half), so its controls use fixed on-dark colors rather
-   than the theme-following --color-primary/--color-accent tokens. */
 .home-header button,
 .home-hero button {
   background: var(--green-300);
-  color: var(--navy-900);
+  color: var(--green-900);
 }
 .home-header button:hover,
 .home-hero button:hover {
-  background: #a8cf82;
+  background: var(--green-400);
 }
 .home-features {
-  background: var(--color-bg);
+  background: var(--color-bg-gradient);
   color: var(--color-text-primary);
   padding: 3rem clamp(1.5rem, 5vw, 4rem);
   display: grid;
@@ -425,6 +621,7 @@ td {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   padding: 1.5rem;
 }
 .home-features h2 {
@@ -439,14 +636,11 @@ td {
 
 @media (max-width: 760px) {
   .shell {
-    grid-template: auto auto 1fr / 1fr;
-  }
-  header {
-    grid-column: 1;
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template: auto 1fr / 1fr;
   }
   aside {
+    flex-direction: row;
+    align-items: center;
     overflow-x: auto;
   }
   nav {
