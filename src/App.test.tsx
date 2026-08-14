@@ -61,9 +61,7 @@ describe("dashboard demo", () => {
                         temperatureC: 24.5,
                         ph: 7.2,
                         lightLux: 600,
-                        nitrateMgL: 2.1,
-                        phosphateMgL: 0.4,
-                        potassiumMgL: 3.2,
+                        nutrientPercent: 63.4,
                       },
                     },
                   }
@@ -302,17 +300,10 @@ describe("dashboard demo", () => {
     expect(JSON.stringify(subscriptions)).not.toContain("device.telemetry");
   });
 
-  it("exposes all six telemetry parameter cards", async () => {
+  it("exposes all four telemetry parameter cards", async () => {
     const view = renderApp();
     await vi.waitFor(() => {
-      for (const label of [
-        "Temperature",
-        "pH",
-        "Light",
-        "Nitrate",
-        "Phosphate",
-        "Potassium",
-      ])
+      for (const label of ["Temperature", "pH", "Light", "Nutrient value"])
         expect(screen.getByText(label)).toBeInTheDocument();
     });
     view.unmount();

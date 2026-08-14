@@ -39,7 +39,7 @@
   --purple-500: #7c4fd6;
   --purple-700: #5b32ad;
 
-  /* Six telemetry parameters, each a fixed icon color (the pastel circle
+  /* Four telemetry parameters, each a fixed icon color (the pastel circle
      background is computed from it via color-mix, see .icon-circle below).
      Values are the dataviz skill's validated categorical hue order, skipping
      the green slot (collides with the brand primary) and the red slot
@@ -50,9 +50,7 @@
   --param-temp-fg: #eb6834;
   --param-ph-fg: #2a78d6;
   --param-light-fg: #eda100;
-  --param-nitrate-fg: #1baf7a;
-  --param-phosphate-fg: #e87ba4;
-  --param-potassium-fg: #4a3aa7;
+  --param-nutrient-fg: #1baf7a;
 
   --color-bg: var(--green-50);
   --color-bg-gradient: linear-gradient(
@@ -110,9 +108,7 @@
     --param-temp-fg: #d95926;
     --param-ph-fg: #3987e5;
     --param-light-fg: #c98500;
-    --param-nitrate-fg: #199e70;
-    --param-phosphate-fg: #d55181;
-    --param-potassium-fg: #9085e9;
+    --param-nutrient-fg: #199e70;
   }
 }
 :root[data-theme="dark"] {
@@ -137,9 +133,7 @@
   --param-temp-fg: #d95926;
   --param-ph-fg: #3987e5;
   --param-light-fg: #c98500;
-  --param-nitrate-fg: #199e70;
-  --param-phosphate-fg: #d55181;
-  --param-potassium-fg: #9085e9;
+  --param-nutrient-fg: #199e70;
 }
 
 * {
@@ -328,14 +322,8 @@ header strong {
 .icon-circle--light {
   color: var(--param-light-fg);
 }
-.icon-circle--nitrate {
-  color: var(--param-nitrate-fg);
-}
-.icon-circle--phosphate {
-  color: var(--param-phosphate-fg);
-}
-.icon-circle--potassium {
-  color: var(--param-potassium-fg);
+.icon-circle--nutrient {
+  color: var(--param-nutrient-fg);
 }
 .icon-circle--device {
   color: var(--color-primary);

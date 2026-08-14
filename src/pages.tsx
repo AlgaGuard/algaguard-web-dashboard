@@ -10,9 +10,7 @@ const thresholdFields = [
   ["temperatureC", "Temperature"],
   ["ph", "pH"],
   ["lightLux", "Light intensity"],
-  ["nitrateMgL", "Nitrate"],
-  ["phosphateMgL", "Phosphate"],
-  ["potassiumMgL", "Potassium"],
+  ["nutrientPercent", "Nutrient value"],
 ] as const;
 type ThresholdKey = (typeof thresholdFields)[number][0];
 type ThresholdInputs = Partial<
@@ -119,7 +117,7 @@ function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 const PARAM_ICONS: Record<
-  "temp" | "ph" | "light" | "nitrate" | "phosphate" | "potassium",
+  "temp" | "ph" | "light" | "nutrient",
   ReactNode
 > = {
   temp: (
@@ -153,7 +151,7 @@ const PARAM_ICONS: Record<
       />
     </svg>
   ),
-  nitrate: (
+  nutrient: (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <path
         d="M10 3v6l3.5 6a2 2 0 0 1-1.7 3h-3.6a2 2 0 0 1-1.7-3L10 9"
@@ -165,41 +163,6 @@ const PARAM_ICONS: Record<
         d="M8 3h4"
         stroke="currentColor"
         strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  phosphate: (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M10 3c2.5 3 4.5 6 4.5 8.5a4.5 4.5 0 1 1-9 0C5.5 9 7.5 6 10 3Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  potassium: (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
-      <circle
-        cx="13"
-        cy="6.5"
-        r="1.3"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <circle
-        cx="8.5"
-        cy="14"
-        r="1.6"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path
-        d="M9 8.8 8 12.6M9 7l2.6-1"
-        stroke="currentColor"
-        strokeWidth="1.2"
         strokeLinecap="round"
       />
     </svg>
@@ -591,24 +554,10 @@ export function DashboardPage() {
             simulated={simulated}
           />
           <ValueCard
-            label="Nitrate"
-            paramKey="nitrate"
-            unit=" mg/L"
-            value={values.nitrateMgL}
-            simulated={simulated}
-          />
-          <ValueCard
-            label="Phosphate"
-            paramKey="phosphate"
-            unit=" mg/L"
-            value={values.phosphateMgL}
-            simulated={simulated}
-          />
-          <ValueCard
-            label="Potassium"
-            paramKey="potassium"
-            unit=" mg/L"
-            value={values.potassiumMgL}
+            label="Nutrient value"
+            paramKey="nutrient"
+            unit="%"
+            value={values.nutrientPercent}
             simulated={simulated}
           />
         </div>
